@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Elysium PG Resident Hub</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="auth.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    .room-btn.active { background-color: #2563eb; color: #ffffff; border-color: #1d4ed8; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-12">
+
+  <!-- PIN LOCK SCREEN -->
+  <div id="pinLockModal" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
+      <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900 mb-1">Staff Access Verification</h2>
+      <p class="text-sm text-slate-500 mb-6">Enter your authorized staff PIN to open the uploader</p>
+      
+      <div class="flex justify-center gap-3 mb-6">
+        <input type="password" maxlength="6" id="staffPinInput" 
+               class="w-44 text-center text-3xl tracking-widest font-mono py-2 border-2 border-slate-300 rounded-xl focus:border-blue-600 focus:outline-none" 
+               placeholder="••••" autofocus />
+      </div>
+
+      <p id="pinErrorMsg" class="text-xs text-red-500 font-semibold mb-4 hidden">Please enter a valid PIN.</p>
+
+      <button onclick="unlockApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-500/30 transition">
+        Unlock Portal
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="max-w-4xl mx-auto px-4 pt-4 sm:pt-8">
+    
+    <!-- HEADER -->
+    <header class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <i class="fa-solid fa-building text-blue-600"></i> Elysium PG Hub
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500">42 Rooms (Floors 1–6) &bull; Google Drive Auto-Uploader</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="monthSelect" onchange="loadAadhaarAudit(true)" class="text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="October 2026">October 2026</option>
+          <option value="November 2026">November 2026</option>
+          <option value="December 2026">December 2026</option>
+        </select>
+        <a href="index.html" class="px-3 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-2 transition">
+          <i class="fa-solid fa-arrow-left"></i> Home
+        </a>
+        <button onclick="logoutApp()" class="p-2 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition" title="Lock App">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- STATUS SUMMARY METRICS -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Submitted</span>
+          <p id="aadhaarSubmittedCount" class="text-2xl font-black text-slate-900 mt-0.5">--</p>
+          <span class="text-[10px] text-slate-400">Verified in Drive</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-file-circle-check"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Pending / Missing</span>
+          <p id="aadhaarPendingCount" class="text-2xl font-black text-slate-900 mt-0.5">--</p>
+          <span class="text-[10px] text-slate-400">Needs collection</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT LIST CONTAINER -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-6 space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-clipboard-user text-blue-600"></i> Aadhaar Verification Ledger
+        </h3>
+        <button type="button" onclick="loadAadhaarAudit(true)" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+          <i class="fa-solid fa-rotate text-[10px]"></i> Refresh Status
+        </button>
+      </div>
+
+      <div id="aadhaarAuditList" class="space-y-2 text-xs">
+        <p class="text-slate-400 italic py-4 text-center">Scanning Google Drive folders...</p>
+      </div>
+    </div>
+
+    <!-- UPLOAD WORKSPACE -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+      <!-- ROOM SELECTOR -->
+      <div class="md:col-span-5 bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+          <span>1. Select Room</span>
+          <span id="selectedRoomDisplay" class="text-blue-600 font-extrabold text-base">Room 101</span>
+        </h2>
+
+        <!-- Floor Navigation -->
+        <div class="grid grid-cols-6 gap-1 bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold text-center">
+          <button onclick="showFloor(1)" class="floor-tab py-1.5 rounded-lg active bg-white shadow-sm text-blue-600" id="tabFloor1">F1</button>
+          <button onclick="showFloor(2)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor2">F2</button>
+          <button onclick="showFloor(3)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor3">F3</button>
+          <button onclick="showFloor(4)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor4">F4</button>
+          <button onclick="showFloor(5)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor5">F5</button>
+          <button onclick="showFloor(6)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor6">F6</button>
+        </div>
+
+        <!-- Room Buttons Grid -->
+        <div id="roomsGrid" class="grid grid-cols-4 gap-2"></div>
+      </div>
+
+      <!-- UPLOAD FORM -->
+      <div class="md:col-span-7 bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">2. Resident &amp; Document Details</h2>
+
+        <form id="uploadForm" onsubmit="handleUpload(event)" class="space-y-4">
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Resident Full Name</label>
+            <input type="text" id="residentName" required placeholder="e.g. Rahul Sharma"
+                   class="w-full text-sm px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Document Type</label>
+              <select id="docType" class="w-full text-sm px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="Aadhaar">Aadhaar Card</option>
+                <option value="PAN">PAN Card</option>
+                <option value="RentalAgreement">Rental Agreement</option>
+                <option value="PoliceVerification">Police Verification</option>
+                <option value="OfficeID">Office / College ID</option>
+                <option value="Photo">Resident Photo</option>
+                <option value="Other">Other Document</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number (Optional)</label>
+              <input type="tel" id="residentPhone" placeholder="10-digit mobile"
+                     class="w-full text-sm px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+
+          <!-- File Upload Zone -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Choose or Capture Document</label>
+            <div class="relative border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-4 text-center cursor-pointer transition bg-slate-50">
+              <input type="file" id="fileInput" required accept="image/*,application/pdf" onchange="previewSelectedFile()"
+                     class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+              <div id="dropPrompt">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-blue-500 mb-2"></i>
+                <p class="text-xs font-bold text-slate-700">Tap to snap photo or select file</p>
+                <p class="text-[11px] text-slate-400">PDF, JPG, PNG</p>
+              </div>
+              <div id="fileSelectedDisplay" class="hidden text-xs font-semibold text-blue-700">
+                <i class="fa-solid fa-file-circle-check text-2xl text-emerald-500 mb-1"></i>
+                <p id="fileNamePreview">file_name.pdf</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drive Destination Preview -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+            <span class="font-bold text-slate-700">Drive Destination: </span>
+            <span class="font-mono text-slate-500 font-semibold">Elysium PG / <span id="previewFolder">101</span> / </span>
+            <span id="previewAutoName" class="font-mono text-blue-600 font-semibold">101_Aadhaar_Resident.pdf</span>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="submitBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Upload to Common Drive</span>
+          </button>
+        </form>
+
+        <!-- Status Display -->
+        <div id="statusBox" class="mt-4 p-3 rounded-xl text-xs font-semibold hidden"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentFloor = 1;
+    let selectedRoom = "101";
+
+    window.addEventListener("DOMContentLoaded", () => {
+      if (getAuthRole() === "VIEWER") {
+        alert("Aadhaar documents are available to Admin accounts only.");
+        window.location.replace("index.html");
+        return;
+      }
+      buildRoomsGrid(1);
+      updatePreviewName();
+
+      if (isAuthenticated()) {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadAadhaarAudit();
+        });
+      } else {
+        document.getElementById("pinLockModal").classList.remove("hidden");
+      }
+
+      document.getElementById("residentName").addEventListener("input", updatePreviewName);
+      document.getElementById("docType").addEventListener("change", updatePreviewName);
+    });
+
+    function unlockApp() {
+      verifyStaffPin("staffPinInput", "pinErrorMsg", () => {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadAadhaarAudit();
+        });
+      });
+    }
+
+    function showFloor(floorNum) {
+      currentFloor = floorNum;
+      document.querySelectorAll(".floor-tab").forEach((tab, idx) => {
+        if (idx + 1 === floorNum) {
+          tab.classList.add("bg-white", "shadow-sm", "text-blue-600");
+          tab.classList.remove("text-slate-600");
+        } else {
+          tab.classList.remove("bg-white", "shadow-sm", "text-blue-600");
+          tab.classList.add("text-slate-600");
+        }
+      });
+      buildRoomsGrid(floorNum);
+    }
+
+    function buildRoomsGrid(floor) {
+      const grid = document.getElementById("roomsGrid");
+      grid.innerHTML = "";
+      for (let i = 1; i <= 7; i++) {
+        const roomNum = `${floor}0${i}`;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `room-btn p-3 rounded-xl border text-sm font-bold transition flex flex-col items-center justify-center ${
+          roomNum === selectedRoom ? "active" : "bg-slate-50 border-slate-200 text-slate-700 hover:border-blue-400"
+        }`;
+        btn.innerHTML = `<span class="text-xs text-slate-400 font-normal">Room</span><span>${roomNum}</span>`;
+        btn.onclick = () => selectRoom(roomNum);
+        grid.appendChild(btn);
+      }
+    }
+
+    function selectRoom(roomNum) {
+      selectedRoom = String(roomNum);
+      const floorNum = parseInt(selectedRoom[0], 10);
+      if (floorNum >= 1 && floorNum <= 6 && floorNum !== currentFloor) {
+        showFloor(floorNum);
+      }
+      document.getElementById("selectedRoomDisplay").innerText = `Room ${roomNum}`;
+      document.getElementById("previewFolder").innerText = roomNum;
+      buildRoomsGrid(currentFloor);
+      updatePreviewName();
+    }
+
+    function updatePreviewName() {
+      const resName = document.getElementById("residentName").value.trim().replace(/[^a-zA-Z0-9]/g, "") || "Resident";
+      const docType = document.getElementById("docType").value;
+      const fileInput = document.getElementById("fileInput");
+      let ext = "pdf";
+      if (fileInput.files.length > 0) {
+        const parts = fileInput.files[0].name.split(".");
+        if (parts.length > 1) ext = parts.pop();
+      }
+      const formatted = `${selectedRoom}_${docType}_${resName}.${ext}`;
+      document.getElementById("previewAutoName").innerText = formatted;
+      return formatted;
+    }
+
+    function previewSelectedFile() {
+      const fileInput = document.getElementById("fileInput");
+      if (fileInput.files.length > 0) {
+        document.getElementById("dropPrompt").classList.add("hidden");
+        document.getElementById("fileSelectedDisplay").classList.remove("hidden");
+        document.getElementById("fileNamePreview").innerText = fileInput.files[0].name;
+        updatePreviewName();
+      }
+    }
+
+    async function loadAadhaarAudit(force = false) {
+      const month = document.getElementById("monthSelect").value;
+      const container = document.getElementById("aadhaarAuditList");
+      container.innerHTML = `<div class="text-center py-6 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Auditing records for ${esc(month)}...</div>`;
+
+      try {
+        const json = await apiGet("getAadhaarStatus", { month: month, forceRefresh: force ? "true" : "" });
+
+        document.getElementById("aadhaarSubmittedCount").innerText = json.submittedCount;
+        document.getElementById("aadhaarPendingCount").innerText = json.pendingCount;
+
+        container.innerHTML = "";
+
+        // 1. Missing / Pending Residents
+        if (json.pending && json.pending.length > 0) {
+          json.pending.forEach(p => {
+            const item = document.createElement("div");
+            item.className = "p-3 bg-rose-50/60 border border-rose-200 rounded-xl flex items-center justify-between gap-3";
+            
+            const cleanMobile = whatsappNumber(p.mobile);
+            const msg = encodeURIComponent(`Hi ${p.name}, this is a reminder from Elysium PG to submit a photo or PDF of your Aadhaar document for verification records for Room ${p.room}. Thank you!`);
+            const waLink = cleanMobile ? `https://wa.me/${cleanMobile}?text=${msg}` : "";
+
+            item.innerHTML = `
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-slate-900">Room ${esc(p.room)}</span>
+                  <span class="text-slate-300">&bull;</span>
+                  <span class="font-bold text-slate-800">${esc(p.name)}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-700">Missing</span>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-0.5">Joined: ${esc(p.joiningDate) || "N/A"} &bull; Mobile: ${esc(p.mobile) || "None"}</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                ${cleanMobile ? `
+                  <a href="${waLink}" target="_blank" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition">
+                    <i class="fa-brands fa-whatsapp"></i> Request
+                  </a>` : ""}
+                <button type="button" onclick="selectRoom('${p.room}')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-bold text-[11px] transition">
+                  Upload
+                </button>
+              </div>
+            `;
+            container.appendChild(item);
+          });
+        }
+
+        // 2. Submitted / Verified Residents
+        if (json.submitted && json.submitted.length > 0) {
+          json.submitted.forEach(s => {
+            const item = document.createElement("div");
+            item.className = "p-3 bg-emerald-50/40 border border-emerald-200 rounded-xl flex items-center justify-between gap-3";
+            item.innerHTML = `
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-slate-900">Room ${esc(s.room)}</span>
+                  <span class="text-slate-300">&bull;</span>
+                  <span class="font-bold text-slate-800">${esc(s.name)}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">Verified</span>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-0.5">File: ${esc(s.file.name)}</p>
+              </div>
+
+              <a href="${s.file.url}" target="_blank" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] flex items-center gap-1 transition">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> View
+              </a>
+            `;
+            container.appendChild(item);
+          });
+        }
+
+        if ((!json.pending || json.pending.length === 0) && (!json.submitted || json.submitted.length === 0)) {
+          container.innerHTML = `<p class="text-slate-400 italic py-4 text-center">No active occupants found for ${esc(month)}.</p>`;
+        }
+
+      } catch (err) {
+        container.innerHTML = `<div class="p-3 text-rose-600 font-bold bg-rose-50 rounded-xl">Error: ${esc(err.message)}</div>`;
+      }
+    }
+
+    async function handleUpload(e) {
+      e.preventDefault();
+
+      const fileInput = document.getElementById("fileInput");
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Please select a file or snap a photo.");
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const resident = document.getElementById("residentName").value.trim();
+      const finalFileName = updatePreviewName();
+      const submitBtn = document.getElementById("submitBtn");
+      const statusBox = document.getElementById("statusBox");
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading to Drive...`;
+      statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = `Uploading ${finalFileName} to Elysium PG / ${selectedRoom}...`;
+
+      try {
+        const prepared = await prepareUploadFile(file);
+        const result = await apiPost({
+          action: "uploadResidentDocument",
+          roomNumber: selectedRoom,
+          resident: resident,
+          fileName: finalFileName,
+          mimeType: prepared.mimeType,
+          base64: prepared.base64
+        });
+
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1.5"></i> Document uploaded successfully to Room ${esc(selectedRoom)}!`;
+
+        setTimeout(() => {
+          statusBox.classList.add("hidden");
+        }, 5000);
+
+        document.getElementById("uploadForm").reset();
+        document.getElementById("dropPrompt").classList.remove("hidden");
+        document.getElementById("fileSelectedDisplay").classList.add("hidden");
+        updatePreviewName();
+        loadAadhaarAudit(true);
+      } catch (err) {
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>Upload to Common Drive</span>`;
+      }
+    }
+  </script>
+</body>
+</html>

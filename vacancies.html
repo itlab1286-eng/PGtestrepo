@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Elysium PG - Vacancies & Availability</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="auth.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
+
+  <!-- PIN LOCK SCREEN -->
+  <div id="pinLockModal" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
+      <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900 mb-1">Staff Verification</h2>
+      <p class="text-sm text-slate-500 mb-6">Enter PIN to access Vacancies</p>
+      
+      <div class="flex justify-center mb-6">
+        <input type="password" maxlength="6" id="staffPinInput" 
+               class="w-44 text-center text-3xl tracking-widest font-mono py-2 border-2 border-slate-300 rounded-xl focus:border-rose-600 focus:outline-none" 
+               placeholder="••••" autofocus />
+      </div>
+
+      <p id="pinErrorMsg" class="text-xs text-red-500 font-semibold mb-4 hidden">Invalid PIN.</p>
+
+      <button onclick="unlockApp()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-rose-500/30 transition">
+        Unlock Vacancies
+      </button>
+    </div>
+  </div>
+
+  <!-- FILL BED SELECTION MODAL -->
+  <div id="fillBedModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-bed text-rose-600"></i> Fill Bed in <span id="fillModalRoomBadge" class="text-indigo-600">Room --</span>
+          </h2>
+          <p id="fillModalRoomDetails" class="text-xs text-slate-500">Select stay type to onboard</p>
+        </div>
+        <button type="button" onclick="closeFillBedModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-600 mb-4 font-medium">
+        Choose whether this bed is being occupied by a monthly resident or a short daily guest:
+      </p>
+
+      <div class="space-y-3">
+        <button type="button" onclick="goToMonthlyOnboarding()" 
+                class="w-full p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/50 transition flex items-center gap-3 text-left group">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg group-hover:scale-105 transition">
+            <i class="fa-solid fa-id-card"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition">Monthly Resident</h3>
+            <p class="text-[11px] text-slate-500">Rent, advance, and Aadhaar document</p>
+          </div>
+          <i class="fa-solid fa-chevron-right ml-auto text-xs text-slate-400 group-hover:text-indigo-600 transition"></i>
+        </button>
+
+        <button type="button" onclick="goToDailyCheckIn()" 
+                class="w-full p-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 hover:bg-emerald-50/50 transition flex items-center gap-3 text-left group">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg group-hover:scale-105 transition">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-slate-900 group-hover:text-emerald-600 transition">Daily Staying Guest</h3>
+            <p class="text-[11px] text-slate-500">Day-wise stay, caution deposit</p>
+          </div>
+          <i class="fa-solid fa-chevron-right ml-auto text-xs text-slate-400 group-hover:text-emerald-600 transition"></i>
+        </button>
+      </div>
+
+      <button type="button" onclick="closeFillBedModal()" class="w-full mt-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- REPORT VACANCY NOTICE MODAL -->
+  <div id="reportVacancyModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-xmark text-rose-600"></i> Report Vacancy Notice
+          </h2>
+          <p class="text-xs text-slate-500">Record departure & adjust pro-rated rent</p>
+        </div>
+        <button type="button" onclick="closeReportModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="reportVacancyForm" onsubmit="submitVacancyNotice(event)" class="space-y-4">
+        <input type="hidden" id="vacSelectedResidentRent" value="0" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Room No. *</label>
+            <input type="number" id="modalRoomNum" required placeholder="e.g. 101" oninput="onModalRoomChange()"
+                   class="w-full text-xs font-bold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Resident *</label>
+            <select id="modalResidentSelect" required onchange="onModalResidentPicked()" class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none">
+              <option value="">Type Room No. first...</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Vacating Date (Departure Date) *</label>
+          <input type="date" id="modalVacatingDate" required onchange="calculateVacProRatedRent()"
+                 class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none" />
+        </div>
+
+        <!-- Rent Adjustment Component -->
+        <div class="bg-rose-50/60 p-3.5 rounded-2xl border border-rose-100 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-bold">Standard Room Rent:</span>
+            <span id="vacStandardRentBadge" class="font-mono font-black text-slate-800">₹0</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-bold">Days Stayed:</span>
+            <span id="vacDaysStayedBadge" class="font-mono font-bold text-rose-700">--</span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-800 mb-1">Agreed Departure Month Rent (₹) *</label>
+            <input type="number" id="modalAdjustedRent" required
+                   class="w-full text-sm font-black px-3.5 py-2 border border-rose-200 bg-white rounded-xl font-mono text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" />
+            <p class="text-[10px] text-slate-400 mt-1">Suggested pro-rated rent shown. Modify or round off as agreed.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Notice / Informed Date *</label>
+          <input type="date" id="modalInformedDate" required
+                 class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none" />
+        </div>
+
+        <div id="modalStatusBox" class="p-3 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeReportModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+            Cancel
+          </button>
+          <button type="submit" id="modalSubmitBtn" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-500/20 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Save Notice</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN WRAPPER -->
+  <div class="max-w-4xl mx-auto px-4 pt-4 sm:pt-8">
+    
+    <!-- HEADER -->
+    <header class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <a href="index.html" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
+            <i class="fa-solid fa-arrow-left"></i> Home
+          </a>
+          <span class="text-slate-300">&bull;</span>
+          <span class="text-xs font-bold text-rose-600 uppercase tracking-wider">Live & Upcoming</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+          <i class="fa-solid fa-door-open text-rose-600"></i> Elysium Vacancies
+        </h1>
+      </div>
+
+      <div class="flex items-center flex-wrap gap-2.5">
+        <button onclick="openReportModal()" class="px-3 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-plus"></i>
+          <span>Report Vacancy</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <div class="flex flex-col text-left">
+            <label class="text-[9px] font-bold text-slate-400 uppercase">Check Date</label>
+            <input type="date" id="vacancyCheckDate" onchange="loadVacancies()" 
+                   class="text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-rose-500" />
+          </div>
+
+          <div class="flex flex-col text-left">
+            <label class="text-[9px] font-bold text-slate-400 uppercase">Target Month</label>
+            <select id="monthSelect" onchange="loadVacancies()" class="text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-rose-500">
+              <option value="October 2026">October 2026</option>
+              <option value="November 2026">November 2026</option>
+              <option value="December 2026">December 2026</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="logoutApp()" class="p-2 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition" title="Lock">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- METRICS CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Available Now</span>
+          <p id="metricCurrentOpen" class="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5">--</p>
+          <span class="text-[10px] text-slate-400">Ready for instant check-in</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-bed"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Future Bookings</span>
+          <p id="metricReservedOpen" class="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5">--</p>
+          <span class="text-[10px] text-slate-400">Arriving later this month</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-calendar-check"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Upcoming Vacancies</span>
+          <p id="metricFutureOpen" class="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5">--</p>
+          <span class="text-[10px] text-slate-400">Notice served / Vacating</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS: CURRENT VS RESERVED VS FUTURE -->
+    <div class="flex gap-2 mb-4 bg-slate-200/70 p-1 rounded-2xl text-xs font-bold">
+      <button onclick="switchTab('current')" id="tabBtnCurrent" class="flex-1 py-2.5 rounded-xl transition bg-white text-slate-900 shadow-sm">
+        <i class="fa-solid fa-circle-check text-rose-600 mr-1"></i> Ready Now (<span id="tabCountCurrent">0</span>)
+      </button>
+      <button onclick="switchTab('reserved')" id="tabBtnReserved" class="flex-1 py-2.5 rounded-xl transition text-slate-600">
+        <i class="fa-solid fa-calendar-check text-purple-600 mr-1"></i> Reserved (<span id="tabCountReserved">0</span>)
+      </button>
+      <button onclick="switchTab('future')" id="tabBtnFuture" class="flex-1 py-2.5 rounded-xl transition text-slate-600">
+        <i class="fa-solid fa-calendar-days text-amber-500 mr-1"></i> Vacating (<span id="tabCountFuture">0</span>)
+      </button>
+    </div>
+
+    <!-- QUICK FILTERS TOOLBAR -->
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-2.5">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-bold text-slate-400 flex items-center gap-1">
+            <i class="fa-solid fa-filter text-[10px]"></i> Filters:
+          </span>
+
+          <select id="filterAC" onchange="applyFilters()" 
+                  class="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-500">
+            <option value="ALL">All Room Types</option>
+            <option value="Yes">AC Only</option>
+            <option value="No">Non-AC Only</option>
+          </select>
+
+          <select id="filterSharing" onchange="applyFilters()" 
+                  class="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-500">
+            <option value="ALL">All Sharings</option>
+            <option value="2">2-Sharing</option>
+            <option value="3">3-Sharing</option>
+            <option value="4">4-Sharing</option>
+          </select>
+
+          <select id="filterFloor" onchange="applyFilters()" 
+                  class="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-500">
+            <option value="ALL">All Floors</option>
+            <option value="1">1st Floor</option>
+            <option value="2">2nd Floor</option>
+            <option value="3">3rd Floor</option>
+            <option value="4">4th Floor</option>
+            <option value="5">5th Floor</option>
+            <option value="6">6th Floor</option>
+          </select>
+        </div>
+
+        <button type="button" onclick="resetFilters()" 
+                class="text-xs font-bold text-rose-600 hover:text-rose-800 transition flex items-center gap-1">
+          <i class="fa-solid fa-rotate-left text-[10px]"></i> Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 1: CURRENT AVAILABLE BEDS -->
+    <div id="sectionCurrent" class="space-y-3">
+      <div id="currentCardsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="col-span-2 text-center py-10 text-slate-400 text-xs font-semibold">
+          <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Checking current vacancies...
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: RESERVED / FUTURE JOININGS -->
+    <div id="sectionReserved" class="space-y-3 hidden">
+      <div id="reservedCardsList" class="space-y-3">
+        <div class="text-center py-10 text-slate-400 text-xs font-semibold">
+          <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Checking upcoming bookings...
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: FUTURE / UPCOMING VACANCIES -->
+    <div id="sectionFuture" class="space-y-3 hidden">
+      <div id="futureCardsList" class="space-y-3">
+        <div class="text-center py-10 text-slate-400 text-xs font-semibold">
+          <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Checking upcoming departures...
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let vacancyData = { currentVacancies: [], reservedVacancies: [], futureVacancies: [] };
+    let selectedRoomForFill = null;
+    let roomResidentCache = [];
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const today = todayISO();
+      const checkDateEl = document.getElementById("vacancyCheckDate");
+      const informedEl = document.getElementById("modalInformedDate");
+      const vacatingEl = document.getElementById("modalVacatingDate");
+
+      if (checkDateEl) checkDateEl.value = today;
+      if (informedEl) informedEl.value = today;
+      if (vacatingEl) vacatingEl.value = today;
+
+      const pinBox = document.getElementById("staffPinInput");
+      if (pinBox) {
+        pinBox.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") unlockApp();
+        });
+      }
+
+      if (typeof isAuthenticated === "function" && isAuthenticated()) {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadVacancies();
+        });
+      } else {
+        document.getElementById("pinLockModal").classList.remove("hidden");
+      }
+    });
+
+    function unlockApp() {
+      verifyStaffPin("staffPinInput", "pinErrorMsg", () => {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadVacancies();
+        });
+      });
+    }
+
+    function switchTab(tab) {
+      const btnCurrent = document.getElementById("tabBtnCurrent");
+      const btnReserved = document.getElementById("tabBtnReserved");
+      const btnFuture = document.getElementById("tabBtnFuture");
+
+      const secCurrent = document.getElementById("sectionCurrent");
+      const secReserved = document.getElementById("sectionReserved");
+      const secFuture = document.getElementById("sectionFuture");
+
+      [btnCurrent, btnReserved, btnFuture].forEach(b => {
+        b.className = "flex-1 py-2.5 rounded-xl transition text-slate-600";
+      });
+      [secCurrent, secReserved, secFuture].forEach(s => s.classList.add("hidden"));
+
+      if (tab === "current") {
+        btnCurrent.className = "flex-1 py-2.5 rounded-xl transition bg-white text-slate-900 shadow-sm";
+        secCurrent.classList.remove("hidden");
+      } else if (tab === "reserved") {
+        btnReserved.className = "flex-1 py-2.5 rounded-xl transition bg-white text-slate-900 shadow-sm";
+        secReserved.classList.remove("hidden");
+      } else {
+        btnFuture.className = "flex-1 py-2.5 rounded-xl transition bg-white text-slate-900 shadow-sm";
+        secFuture.classList.remove("hidden");
+      }
+    }
+
+    function getAcStatusBadge(ac, acUsing) {
+      const isAc = String(ac || "").trim().toLowerCase() === "yes";
+      const isUsing = String(acUsing || "").trim().toLowerCase() === "yes";
+
+      if (!isAc) {
+        return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Non-AC</span>`;
+      }
+      
+      if (isUsing) {
+        return `<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
+          <i class="fa-solid fa-snowflake text-cyan-600 text-[10px]"></i> AC (In Use)
+        </span>`;
+      } else {
+        return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+          <i class="fa-regular fa-snowflake text-amber-500 text-[10px]"></i> AC (Idle / Off)
+        </span>`;
+      }
+    }
+
+    async function loadVacancies(retries = 2) {
+      const month = document.getElementById("monthSelect").value;
+      const checkDate = document.getElementById("vacancyCheckDate").value;
+
+      const currentContainer = document.getElementById("currentCardsList");
+      const reservedContainer = document.getElementById("reservedCardsList");
+      const futureContainer = document.getElementById("futureCardsList");
+
+      currentContainer.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Checking bed schedules for ${checkDate}...</div>`;
+      reservedContainer.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Loading future bookings...</div>`;
+      futureContainer.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Loading vacate notices...</div>`;
+
+      try {
+        const json = await apiGet("getVacanciesData", { month: month, checkDate: checkDate });
+
+        vacancyData = json;
+        renderVacancies();
+      } catch (err) {
+        currentContainer.innerHTML = `<div class="col-span-2 text-center py-6 text-rose-500 text-xs font-bold">Error: ${esc(err.message)}</div>`;
+      }
+    }
+
+    function applyFilters() {
+      renderVacancies();
+    }
+
+    function resetFilters() {
+      document.getElementById("filterAC").value = "ALL";
+      document.getElementById("filterSharing").value = "ALL";
+      document.getElementById("filterFloor").value = "ALL";
+      renderVacancies();
+    }
+
+    function renderVacancies() {
+      const currentListRaw = vacancyData.currentVacancies || [];
+      const reservedListRaw = vacancyData.reservedVacancies || [];
+      const futureListRaw = vacancyData.futureVacancies || [];
+
+      const selectedAC = document.getElementById("filterAC").value;
+      const selectedSharing = document.getElementById("filterSharing").value;
+      const selectedFloor = document.getElementById("filterFloor").value;
+
+      function matchesFilter(item) {
+        if (selectedAC !== "ALL") {
+          const itemAc = (item.ac || "No").toString().trim();
+          if (itemAc.toLowerCase() !== selectedAC.toLowerCase()) return false;
+        }
+
+        if (selectedSharing !== "ALL") {
+          const cap = String(item.capacity || "").trim();
+          if (cap !== selectedSharing) return false;
+        }
+
+        if (selectedFloor !== "ALL") {
+          const floor = String(item.floor || item.roomNumber[0] || "").trim();
+          if (floor !== selectedFloor) return false;
+        }
+
+        return true;
+      }
+
+      const filteredCurrent = currentListRaw.filter(matchesFilter);
+      const filteredReserved = reservedListRaw.filter(matchesFilter);
+      const filteredFuture = futureListRaw.filter(matchesFilter);
+
+      let totalCurrentBeds = 0;
+      filteredCurrent.forEach(c => totalCurrentBeds += c.openBeds);
+
+      document.getElementById("metricCurrentOpen").innerText = totalCurrentBeds;
+      document.getElementById("metricReservedOpen").innerText = filteredReserved.length;
+      document.getElementById("metricFutureOpen").innerText = filteredFuture.length;
+
+      document.getElementById("tabCountCurrent").innerText = totalCurrentBeds;
+      document.getElementById("tabCountReserved").innerText = filteredReserved.length;
+      document.getElementById("tabCountFuture").innerText = filteredFuture.length;
+
+      // 1. Render Current Openings
+      const currentContainer = document.getElementById("currentCardsList");
+      if (filteredCurrent.length === 0) {
+        currentContainer.innerHTML = `
+          <div class="col-span-2 p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500 font-semibold">
+            No current vacancies match the selected filters.
+          </div>`;
+      } else {
+        currentContainer.innerHTML = "";
+        filteredCurrent.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3";
+
+          let dailyBadge = "";
+          if (item.dailyGuests && item.dailyGuests.length > 0) {
+            const d = item.dailyGuests[0];
+            dailyBadge = `
+              <div class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                <i class="fa-solid fa-clock-rotate-left text-amber-600"></i>
+                <span>${item.dailyGuests.length} Daily Stay (${esc(d.name)} till ${esc(d.vacatingDate)})</span>
+              </div>
+            `;
+          }
+
+          let reservedNotice = "";
+          if (item.reservedCount > 0) {
+            reservedNotice = `
+              <span class="inline-block mt-1 px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md font-bold text-[10px]">
+                <i class="fa-solid fa-calendar-check mr-1"></i>${item.reservedCount} Bed Reserved for later
+              </span>
+            `;
+          }
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-base font-black text-slate-900">Room ${esc(item.roomNumber)}</span>
+                  ${getAcStatusBadge(item.ac, item.acUsing)}
+                </div>
+                <p class="text-xs text-slate-500 font-semibold mt-1">Floor ${item.floor} &bull; ${esc(item.capacity)}-Sharing</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">${item.activeCount} / ${esc(item.capacity)} beds filled</p>
+                ${dailyBadge}
+                ${reservedNotice}
+              </div>
+
+              <div class="text-right">
+                <span class="inline-block px-3 py-1 bg-rose-100 text-rose-700 font-black text-xs rounded-xl">
+                  ${item.openBeds} Bed${item.openBeds > 1 ? 's' : ''} Open
+                </span>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                <i class="fa-solid fa-circle text-[7px] text-rose-500"></i> Ready Now
+              </span>
+              <button type="button" data-room="${esc(item.roomNumber)}" data-cap="${esc(item.capacity)}" data-ac="${esc(item.ac)}" onclick="openFillBedModal(this.dataset.room, this.dataset.cap, this.dataset.ac)" 
+                      class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-user-plus"></i>
+                <span>Fill Bed</span>
+              </button>
+            </div>
+          `;
+          currentContainer.appendChild(card);
+        });
+      }
+
+      // 2. Render Reserved / Future Bookings
+      const reservedContainer = document.getElementById("reservedCardsList");
+      if (filteredReserved.length === 0) {
+        reservedContainer.innerHTML = `
+          <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500 font-semibold">
+            No future reservations recorded for this month.
+          </div>`;
+      } else {
+        reservedContainer.innerHTML = "";
+        filteredReserved.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "p-4 bg-white rounded-2xl border border-purple-200 bg-purple-50/20 shadow-sm flex flex-wrap items-center justify-between gap-3";
+
+          const isDaily = item.stayType === "Daily";
+
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-base font-black text-slate-900">Room ${esc(item.roomNumber)}</span>
+                ${getAcStatusBadge(item.ac, item.acUsing)}
+                <span class="text-xs text-slate-500 font-bold">&bull; ${esc(item.capacity)}-Sharing</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isDaily ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'}">
+                  ${isDaily ? 'Daily Booking' : 'Monthly Advance Booking'}
+                </span>
+              </div>
+              <p class="text-xs font-bold text-slate-800 mt-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-user text-purple-600 text-xs"></i> ${esc(item.residentName)}
+                ${item.mobile ? `<span class="text-[11px] text-slate-400 font-normal">(${esc(item.mobile)})</span>` : ''}
+              </p>
+              ${item.remarks ? `<p class="text-[11px] text-slate-500 italic mt-0.5">${esc(item.remarks)}</p>` : ''}
+            </div>
+
+            <div class="text-right">
+              <span class="inline-block px-3 py-1 bg-purple-100 text-purple-800 font-black text-xs rounded-xl">
+                Arrives: ${esc(item.joiningDate)}
+              </span>
+              <p class="text-[10px] font-bold text-purple-600 mt-1">Bed locked for monthly tenants</p>
+            </div>
+          `;
+          reservedContainer.appendChild(card);
+        });
+      }
+
+      // 3. Render Upcoming Departures
+      const futureContainer = document.getElementById("futureCardsList");
+      if (filteredFuture.length === 0) {
+        futureContainer.innerHTML = `
+          <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500 font-semibold">
+            No upcoming vacate notices match the selected filters.
+          </div>`;
+      } else {
+        futureContainer.innerHTML = "";
+        filteredFuture.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "p-4 bg-white rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-wrap items-center justify-between gap-3";
+
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          const vacDate = new Date(item.vacatingDate);
+          const diffDays = Math.ceil((vacDate - today) / (1000 * 60 * 60 * 24));
+          const daysBadge = diffDays <= 0 ? "Leaves Today" : (diffDays === 1 ? "Leaves Tomorrow" : `Leaves in ${diffDays} days`);
+
+          const isDaily = item.stayType === "Daily";
+          const stayTypeTag = isDaily
+            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Short Stay</span>`
+            : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Monthly Notice</span>`;
+
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-base font-black text-slate-900">Room ${esc(item.roomNumber)}</span>
+                ${getAcStatusBadge(item.ac, item.acUsing)}
+                <span class="text-xs text-slate-500 font-bold">&bull; ${esc(item.capacity)}-Sharing</span>
+                ${stayTypeTag}
+              </div>
+              <p class="text-xs font-bold text-slate-800 mt-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-user ${isDaily ? 'text-emerald-500' : 'text-amber-500'} text-xs"></i> ${esc(item.residentName)}
+                ${item.mobile ? `<span class="text-[11px] text-slate-400 font-normal">(${esc(item.mobile)})</span>` : ''}
+              </p>
+              ${item.remarks ? `<p class="text-[11px] text-slate-500 italic mt-0.5">${esc(item.remarks)}</p>` : ''}
+            </div>
+            <div class="text-right">
+              <span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 font-black text-xs rounded-xl">
+                Vacant on: ${esc(item.vacatingDate)}
+              </span>
+              <p class="text-[11px] font-bold text-amber-600 mt-1">${daysBadge}</p>
+            </div>
+          `;
+          futureContainer.appendChild(card);
+        });
+      }
+    }
+
+    function openFillBedModal(roomNumber, capacity, ac) {
+      selectedRoomForFill = {
+        roomNumber: roomNumber,
+        capacity: capacity,
+        ac: ac
+      };
+
+      document.getElementById("fillModalRoomBadge").innerText = `Room ${roomNumber}`;
+      document.getElementById("fillModalRoomDetails").innerText = `${capacity}-Sharing • ${ac === 'Yes' ? 'AC' : 'Non-AC'}`;
+      document.getElementById("fillBedModal").classList.remove("hidden");
+    }
+
+    function closeFillBedModal() {
+      document.getElementById("fillBedModal").classList.add("hidden");
+      selectedRoomForFill = null;
+    }
+
+    function goToMonthlyOnboarding() {
+      if (!selectedRoomForFill) return;
+      const month = document.getElementById("monthSelect").value;
+      const room = selectedRoomForFill.roomNumber;
+      const sharing = selectedRoomForFill.capacity;
+      window.location.href = `new_resident.html?room=${encodeURIComponent(room)}&sharing=${encodeURIComponent(sharing)}&month=${encodeURIComponent(month)}`;
+    }
+
+    function goToDailyCheckIn() {
+      if (!selectedRoomForFill) return;
+      const month = document.getElementById("monthSelect").value;
+      const room = selectedRoomForFill.roomNumber;
+      const sharing = selectedRoomForFill.capacity;
+      window.location.href = `daily_staying.html?room=${encodeURIComponent(room)}&sharing=${encodeURIComponent(sharing)}&month=${encodeURIComponent(month)}`;
+    }
+
+    // ==========================================
+    // VACANCY REPORTING MODAL LOGIC
+    // ==========================================
+    function openReportModal() {
+      document.getElementById("reportVacancyModal").classList.remove("hidden");
+      document.getElementById("modalRoomNum").focus();
+    }
+
+    function closeReportModal() {
+      document.getElementById("reportVacancyModal").classList.add("hidden");
+      document.getElementById("reportVacancyForm").reset();
+      document.getElementById("modalStatusBox").classList.add("hidden");
+      const today = todayISO();
+      document.getElementById("modalInformedDate").value = today;
+      document.getElementById("modalVacatingDate").value = today;
+      document.getElementById("vacStandardRentBadge").innerText = "₹0";
+      document.getElementById("vacDaysStayedBadge").innerText = "--";
+    }
+
+    let roomFetchTimeout = null;
+    function onModalRoomChange() {
+      clearTimeout(roomFetchTimeout);
+      const roomNum = document.getElementById("modalRoomNum").value.trim();
+      const residentSelect = document.getElementById("modalResidentSelect");
+
+      if (roomNum.length >= 3) {
+        residentSelect.innerHTML = `<option value="">Loading residents...</option>`;
+        roomFetchTimeout = setTimeout(async () => {
+          try {
+            const month = document.getElementById("monthSelect").value;
+            const json = await apiGet("getResidentsByRoom", { roomNumber: roomNum, month: month });
+
+            if (json.residents && json.residents.length > 0) {
+              roomResidentCache = json.residents;
+              residentSelect.innerHTML = `<option value="">Select resident</option>`;
+              json.residents.forEach(r => {
+                residentSelect.innerHTML += `<option value="${esc(r.name)}">${esc(r.name)} (Rent: ₹${esc(r.expectedRent)})</option>`;
+              });
+            } else {
+              roomResidentCache = [];
+              residentSelect.innerHTML = `<option value="">No residents found in ${roomNum}</option>`;
+            }
+          } catch (e) {
+            residentSelect.innerHTML = `<option value="">Failed loading room residents</option>`;
+          }
+        }, 300);
+      }
+    }
+
+    function onModalResidentPicked() {
+      const selectedName = document.getElementById("modalResidentSelect").value;
+      const res = roomResidentCache.find(r => r.name === selectedName);
+      const standardRent = res ? Number(res.expectedRent) || 0 : 0;
+
+      document.getElementById("vacSelectedResidentRent").value = standardRent;
+      document.getElementById("vacStandardRentBadge").innerText = `₹${standardRent.toLocaleString("en-IN")}`;
+      calculateVacProRatedRent();
+    }
+
+    function calculateVacProRatedRent() {
+      const vacDateStr = document.getElementById("modalVacatingDate").value;
+      const fullRent = parseFloat(document.getElementById("vacSelectedResidentRent").value) || 0;
+      if (!vacDateStr) return;
+
+      const dateObj = new Date(vacDateStr);
+      const day = dateObj.getDate();
+      const totalDaysInMonth = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
+
+      document.getElementById("vacDaysStayedBadge").innerText = `${day} of ${totalDaysInMonth} Days`;
+
+      if (fullRent > 0) {
+        const suggested = Math.round((fullRent / totalDaysInMonth) * day);
+        document.getElementById("modalAdjustedRent").value = suggested;
+      }
+    }
+
+    async function submitVacancyNotice(e) {
+      e.preventDefault();
+      const btn = document.getElementById("modalSubmitBtn");
+      const statusBox = document.getElementById("modalStatusBox");
+
+      const roomNum = document.getElementById("modalRoomNum").value.trim();
+      const residentName = document.getElementById("modalResidentSelect").value;
+      const vacatingDate = document.getElementById("modalVacatingDate").value;
+      const informedDate = document.getElementById("modalInformedDate").value;
+      const adjustedRent = document.getElementById("modalAdjustedRent").value;
+      const month = document.getElementById("monthSelect").value;
+
+      if (!residentName) {
+        alert("Please select a resident");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...`;
+      statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = `Saving notice for ${residentName} in Room ${roomNum}...`;
+
+      const payload = {
+        action: "reportVacancy",
+        month: month,
+        roomNumber: roomNum,
+        residentName: residentName,
+        vacancyDate: vacatingDate,
+        informedDate: informedDate,
+        adjustedRent: adjustedRent
+      };
+
+      try {
+        const json = await apiPost(payload);
+
+        statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(json.message)}`;
+
+        setTimeout(() => {
+          closeReportModal();
+          loadVacancies(2);
+        }, 1200);
+      } catch (err) {
+        statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Save Notice</span>`;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Elysium PG - Portal Login</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="auth.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-slate-800 border border-slate-700/60 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl">
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-inner">
+        <i class="fa-solid fa-hotel"></i>
+      </div>
+      <h1 class="text-2xl font-black tracking-tight text-white">Elysium PG</h1>
+      <p class="text-xs text-slate-400 mt-1">Management Portal Authentication</p>
+    </div>
+
+    <!-- IDENTIFIED BIOMETRIC UNLOCK CARD (Only shows when an account is linked to this device) -->
+    <div id="biometricCard" class="hidden mb-4 p-4 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-center">
+      <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider mb-2">
+        <i class="fa-solid fa-fingerprint text-[10px]"></i> Quick Unlock
+      </div>
+      <h3 id="bioDisplayName" class="text-sm font-bold text-white leading-tight">Master Admin</h3>
+      <p id="bioUsername" class="text-xs text-slate-400 mb-3">@sreekaran</p>
+
+      <button type="button" onclick="triggerNativeBiometric()"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold py-2.5 rounded-xl transition shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 text-xs">
+        <i class="fa-solid fa-fingerprint text-base"></i>
+        <span id="bioUnlockBtnText">Unlock with Fingerprint</span>
+      </button>
+
+      <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between px-1">
+        <button type="button" onclick="toggleFormVisibility(true)" class="text-[11px] text-slate-400 hover:text-slate-200 transition underline underline-offset-2">
+          Sign in with another user
+        </button>
+        <button type="button" onclick="unlinkDeviceBiometrics()" class="text-[11px] text-rose-400/80 hover:text-rose-400 transition flex items-center gap-1">
+          <i class="fa-solid fa-trash-can text-[10px]"></i> Unlink
+        </button>
+      </div>
+    </div>
+
+    <!-- STANDARD LOGIN FORM -->
+    <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Username / Identifier</label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 text-xs pointer-events-none">
+            <i class="fa-solid fa-user"></i>
+          </span>
+          <input type="text" id="loginUsername" required autocomplete="username" autofocus
+                 class="w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition" 
+                 placeholder="e.g. sreekaran" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Password / Security PIN</label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 text-xs pointer-events-none">
+            <i class="fa-solid fa-key"></i>
+          </span>
+          <input type="password" id="loginPassword" required autocomplete="current-password"
+                 class="w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition" 
+                 placeholder="••••••••" />
+        </div>
+      </div>
+
+      <!-- EXPLICIT BIOMETRIC CHECKBOX (Only visible inside Android APK, unchecked by default) -->
+      <div id="biometricCheckboxContainer" class="hidden">
+        <label class="flex items-start gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="enableBiometricCheckbox"
+                 class="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900/70 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-800 transition" />
+          <div class="text-xs text-slate-300 font-medium leading-tight">
+            <span>Enable Fingerprint Unlock on this device</span>
+            <p id="bioOverrideNotice" class="text-[10px] text-amber-400/90 mt-0.5 hidden">
+              Replaces the current linked biometric profile.
+            </p>
+          </div>
+        </label>
+      </div>
+
+      <div id="loginError" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold hidden flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="loginErrorText">Invalid credentials.</span>
+      </div>
+
+      <button type="submit" id="loginSubmitBtn"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 text-sm mt-2">
+        <span>Sign In</span>
+        <i class="fa-solid fa-arrow-right text-xs"></i>
+      </button>
+
+      <!-- Return button if switching back to quick unlock -->
+      <button type="button" id="backToBioBtn" onclick="toggleFormVisibility(false)"
+              class="hidden w-full text-center text-xs text-slate-400 hover:text-slate-200 mt-2 py-1">
+        <i class="fa-solid fa-arrow-left text-[10px]"></i> Back to Quick Unlock
+      </button>
+    </form>
+
+    <div class="mt-6 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+      <i class="fa-solid fa-shield-halved text-[10px] text-emerald-500"></i>
+      <span>Session auto-expires in 1 hr &bull; Closes upon exit</span>
+    </div>
+  </div>
+
+  <script>
+    let currentSavedBioUser = null;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initBiometricUI();
+    });
+
+    // Only plain page names such as "rent.html" are allowed as a post-login destination.
+    // (Anything else - other sites, javascript: links - is ignored.)
+    function safeRedirectTarget() {
+      const wanted = new URLSearchParams(window.location.search).get("redirect") || "";
+      return /^[A-Za-z0-9_-]+\.html$/.test(wanted) && wanted !== "login.html" ? wanted : "index.html";
+    }
+
+    function isAndroidApp() {
+      return !!(window.AndroidBiometric && typeof window.AndroidBiometric.isApp === "function" && window.AndroidBiometric.isApp());
+    }
+
+    function initBiometricUI() {
+      if (!isAndroidApp()) {
+        return; // Regular browser: stay pure web, keep all fingerprint UI hidden
+      }
+
+      // Show the opt-in checkbox inside the Android app
+      const checkContainer = document.getElementById("biometricCheckboxContainer");
+      if (checkContainer) checkContainer.classList.remove("hidden");
+
+      // Is a user already registered for fingerprint unlock on this phone?
+      if (typeof window.AndroidBiometric.getSavedUser === "function") {
+        const raw = window.AndroidBiometric.getSavedUser();
+        if (raw) {
+          try {
+            currentSavedBioUser = JSON.parse(raw);
+            if (currentSavedBioUser && currentSavedBioUser.username) {
+              document.getElementById("bioDisplayName").innerText = currentSavedBioUser.displayName || currentSavedBioUser.username;
+              document.getElementById("bioUsername").innerText = "@" + currentSavedBioUser.username + (currentSavedBioUser.role ? ` • ${currentSavedBioUser.role}` : "");
+              document.getElementById("bioUnlockBtnText").innerText = `Unlock as ${currentSavedBioUser.displayName || currentSavedBioUser.username}`;
+
+              const notice = document.getElementById("bioOverrideNotice");
+              if (notice) {
+                notice.innerText = `Replaces @${currentSavedBioUser.username}'s fingerprint on this device.`;
+                notice.classList.remove("hidden");
+              }
+
+              toggleFormVisibility(false);
+              triggerNativeBiometric(); // open the fingerprint sheet straight away
+              return;
+            }
+          } catch (e) {
+            console.error("Error reading saved fingerprint user:", e);
+          }
+        }
+      }
+      toggleFormVisibility(true);
+    }
+
+    function toggleFormVisibility(showForm) {
+      const bioCard = document.getElementById("biometricCard");
+      const form = document.getElementById("loginForm");
+      const backBtn = document.getElementById("backToBioBtn");
+
+      if (showForm) {
+        if (bioCard) bioCard.classList.add("hidden");
+        form.classList.remove("hidden");
+        if (currentSavedBioUser && backBtn) backBtn.classList.remove("hidden");
+      } else {
+        if (bioCard) bioCard.classList.remove("hidden");
+        form.classList.add("hidden");
+        if (backBtn) backBtn.classList.add("hidden");
+      }
+    }
+
+    function triggerNativeBiometric() {
+      if (window.AndroidBiometric && typeof window.AndroidBiometric.requestBiometric === "function") {
+        window.AndroidBiometric.requestBiometric();
+      }
+    }
+
+    // The phone calls this after a successful fingerprint with the secret it stored at enrolment
+    window.onBiometricUnlock = async function (jsonText) {
+      const label = document.getElementById("bioUnlockBtnText");
+      try {
+        const creds = JSON.parse(jsonText);
+        if (label) label.innerText = "Verifying...";
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "deviceLogin", username: creds.username, deviceId: creds.deviceId, deviceSecret: creds.deviceSecret })
+        });
+        const data = JSON.parse(await res.text());
+        if (data.status === "success" && data.session) {
+          saveSession(data.session);
+          window.location.replace("index.html");
+          return;
+        }
+        if (data.code === "device_invalid" && window.AndroidBiometric && window.AndroidBiometric.clearDevice) {
+          window.AndroidBiometric.clearDevice();   // expired or revoked: forget it on the phone too
+          currentSavedBioUser = null;
+        }
+        alert(data.message || "Fingerprint login failed. Please sign in with your password.");
+      } catch (e) {
+        alert("Fingerprint login error: " + e.message);
+      }
+      if (label && currentSavedBioUser) label.innerText = `Unlock as ${currentSavedBioUser.displayName || currentSavedBioUser.username}`;
+      toggleFormVisibility(true);
+    };
+
+    // Called when the fingerprint sheet is cancelled or fails
+    window.onBiometricUnlockError = function (message) {
+      if (message) {
+        const err = document.getElementById("loginError");
+        const txt = document.getElementById("loginErrorText");
+        if (err && txt) { txt.innerText = message; err.classList.remove("hidden"); }
+      }
+      toggleFormVisibility(true);
+    };
+
+    function unlinkDeviceBiometrics() {
+      if (!confirm("Remove fingerprint unlock from this device? You will need to enter your password next time.")) return;
+
+      if (window.AndroidBiometric && typeof window.AndroidBiometric.clearDevice === "function") {
+        window.AndroidBiometric.clearDevice();
+      }
+
+      currentSavedBioUser = null;
+      const notice = document.getElementById("bioOverrideNotice");
+      if (notice) notice.classList.add("hidden");
+
+      toggleFormVisibility(true);
+      const backBtn = document.getElementById("backToBioBtn");
+      if (backBtn) backBtn.classList.add("hidden");
+    }
+
+    // Registers this phone for fingerprint unlock (only when the user ticked the box).
+    // Returns a short message for the user, or "" when everything worked.
+    async function enrollFingerprint(session) {
+      if (!isAndroidApp() || typeof window.AndroidBiometric.enrollWithFingerprint !== "function") return "";
+
+      if (currentSavedBioUser && currentSavedBioUser.username.toLowerCase() !== session.username.toLowerCase()) {
+        const proceed = confirm(
+          `Fingerprint unlock is currently registered to @${currentSavedBioUser.username}.\n\n` +
+          `Registering @${session.username} will remove @${currentSavedBioUser.username}'s fingerprint access from this phone.\n\n` +
+          `Do you want to proceed?`
+        );
+        if (!proceed) return "";
+      }
+
+      let creds;
+      try {
+        creds = await apiPost({ action: "enrollDevice", label: "Android app" });
+      } catch (e) {
+        return "Could not set up fingerprint: " + e.message;
+      }
+
+      const outcome = await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve({ ok: false, message: "Fingerprint setup timed out." }), 90000);
+        window.onBiometricEnrollResult = (ok, message) => { clearTimeout(timer); resolve({ ok: !!ok, message: message || "" }); };
+        window.AndroidBiometric.enrollWithFingerprint(JSON.stringify({
+          username: session.username,
+          displayName: session.displayName,
+          role: session.role,
+          deviceId: creds.deviceId,
+          deviceSecret: creds.deviceSecret
+        }));
+      });
+
+      if (!outcome.ok) {
+        // the phone could not store it, so cancel the server-side link as well
+        try { await apiPost({ action: "revokeDevice", deviceId: creds.deviceId }); } catch (e) {}
+        return "Fingerprint unlock was not enabled" + (outcome.message ? ": " + outcome.message : ".");
+      }
+      return "";
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById("loginSubmitBtn");
+      const errBox = document.getElementById("loginError");
+      const errText = document.getElementById("loginErrorText");
+
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value.trim();
+      const wantsBiometric = document.getElementById("enableBiometricCheckbox").checked;
+
+      errBox.classList.add("hidden");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-sm"></i> Authenticating...`;
+
+      const resetButton = () => {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Sign In</span> <i class="fa-solid fa-arrow-right text-xs"></i>`;
+      };
+
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "login", username, password })
+        });
+        const raw = await res.text();
+        let data = {};
+        try {
+          data = JSON.parse(raw);
+        } catch (jsonErr) {
+          throw new Error("Server warming up or invalid response. Please try again.");
+        }
+
+        if (data.status === "success" && data.session) {
+          saveSession(data.session);
+
+          let notice = "";
+          if (wantsBiometric) {
+            btn.innerHTML = `<i class="fa-solid fa-fingerprint text-sm"></i> Setting up fingerprint...`;
+            notice = await enrollFingerprint(data.session);
+          }
+          if (notice) {
+            errText.innerText = notice + " You are signed in.";
+            errBox.classList.remove("hidden");
+          }
+
+          setTimeout(() => window.location.replace(safeRedirectTarget()), notice ? 1800 : 250);
+
+        } else {
+          errText.innerText = data.message || "Invalid credentials.";
+          errBox.classList.remove("hidden");
+          resetButton();
+        }
+      } catch (err) {
+        errText.innerText = err.message || "Connection error. Please try again.";
+        errBox.classList.remove("hidden");
+        resetButton();
+      }
+    }
+  </script>
+</body>
+</html>

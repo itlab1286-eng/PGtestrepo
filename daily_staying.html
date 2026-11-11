@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Elysium PG - Daily Staying</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="auth.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
+
+  <!-- PIN LOCK SCREEN -->
+  <div id="pinLockModal" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
+      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900 mb-1">Staff Verification</h2>
+      <p class="text-sm text-slate-500 mb-6">Enter PIN to access Daily Staying</p>
+      
+      <div class="flex justify-center mb-6">
+        <input type="password" maxlength="6" id="staffPinInput" 
+               class="w-44 text-center text-3xl tracking-widest font-mono py-2 border-2 border-slate-300 rounded-xl focus:border-emerald-600 focus:outline-none" 
+               placeholder="••••" autofocus />
+      </div>
+
+      <p id="pinErrorMsg" class="text-xs text-red-500 font-semibold mb-4 hidden">Invalid PIN.</p>
+
+      <button onclick="unlockApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-500/30 transition">
+        Unlock Portal
+      </button>
+    </div>
+  </div>
+
+  <!-- CHECK-IN MODAL (WITH DATE + TIME & SPLIT PAYMENT) -->
+  <div id="checkInModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-user-clock text-emerald-600"></i> New Daily Guest Check-In
+          </h2>
+          <p class="text-xs text-slate-500">Record a short-stay guest with exact check-in &amp; check-out time</p>
+        </div>
+        <button type="button" onclick="closeCheckInModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="checkInForm" onsubmit="submitCheckIn(event)" class="space-y-4">
+        <!-- Room & Resident -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Room No. *</label>
+            <input type="number" id="inRoom" required placeholder="e.g. 102"
+                   class="w-full text-xs font-bold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Sharing *</label>
+            <select id="inSharing" class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl">
+              <option value="2 sharing">2 sharing</option>
+              <option value="3 sharing" selected>3 sharing</option>
+              <option value="4 sharing">4 sharing</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Guest Name *</label>
+            <input type="text" id="inName" required placeholder="e.g. Amit Verma"
+                   class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
+            <input type="tel" id="inMobile" required maxlength="10" placeholder="10-digit number"
+                   class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Dates & Times Calculation -->
+        <div class="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Check-in Date &amp; Time *</label>
+            <div class="grid grid-cols-5 gap-2">
+              <input type="date" id="inJoinedDate" required onchange="recalculateCheckInDays()"
+                     class="col-span-3 text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none" />
+              <input type="time" id="inJoinedTime" required
+                     class="col-span-2 text-xs font-semibold px-2.5 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Expected Vacating Date &amp; Time *</label>
+            <div class="grid grid-cols-5 gap-2">
+              <input type="date" id="inVacatedDate" required onchange="recalculateCheckInDays()"
+                     class="col-span-3 text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none" />
+              <input type="time" id="inVacatedTime" required
+                     class="col-span-2 text-xs font-semibold px-2.5 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-1 border-t border-emerald-100">
+            <span class="font-bold text-slate-600">Calculated Duration:</span>
+            <span id="calculatedDaysBadge" class="font-mono font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-lg text-sm">1 Day</span>
+          </div>
+        </div>
+
+        <!-- Rent & Payment -->
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Total Agreed (₹) *</label>
+            <input type="number" id="inTotalRent" required placeholder="e.g. 1500" oninput="recalculateBalance()"
+                   class="w-full text-xs font-bold px-3 py-2.5 border border-slate-300 rounded-xl font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Paid (₹) *</label>
+            <input type="number" id="inPaid" required placeholder="e.g. 1500" oninput="recalculateBalance()"
+                   class="w-full text-xs font-bold px-3 py-2.5 border border-slate-300 rounded-xl font-mono text-emerald-700" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Balance (₹)</label>
+            <input type="number" id="inBalance" readonly
+                   class="w-full text-xs font-bold px-3 py-2.5 border border-slate-200 bg-slate-50 rounded-xl font-mono text-amber-700" value="0" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Caution Deposit (₹)</label>
+          <input type="number" id="inCaution" placeholder="0 if none"
+                 class="w-full text-xs font-bold px-3 py-2.5 border border-slate-300 rounded-xl font-mono" />
+        </div>
+
+        <!-- PAYMENT MODE (SINGLE VS SPLIT) -->
+        <div class="pt-2 border-t border-slate-100 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-700">Payment Breakdown</label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-emerald-700 hover:text-emerald-900">
+              <input type="checkbox" id="splitPaymentToggle" onchange="toggleSplitPayment('in')" class="rounded text-emerald-600 focus:ring-0 cursor-pointer" />
+              <span>Split Rent Payment</span>
+            </label>
+          </div>
+
+          <!-- SINGLE PAYMENT -->
+          <div id="inSinglePaySection" class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Mode</label>
+              <select id="payMode" class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl">
+                <option value="Cash">Cash</option>
+                <option value="PPay">PPay (PhonePe)</option>
+                <option value="GPay">GPay (Google Pay)</option>
+                <option value="Paytm">Paytm</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Received By</label>
+              <select id="payReceiver" class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl">
+                <option value="None">None (Cash)</option>
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SPLIT PAYMENT -->
+          <div id="inSplitPaySection" class="p-3 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-3 hidden">
+            <p class="text-xs font-black text-emerald-900 flex items-center gap-1">
+              <i class="fa-solid fa-arrows-split-up-and-left"></i> Split Breakdown
+            </p>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Part 1 Mode</span>
+                <select id="splitMode1" onchange="buildSplitSummary('in')" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                  <option value="Cash">Cash</option>
+                  <option value="PPay">PPay</option>
+                  <option value="GPay">GPay</option>
+                  <option value="Bank Transfer">Bank</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Receiver 1</span>
+                <select id="splitReceiver1" onchange="buildSplitSummary('in')" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                  <option value="None">None (Cash)</option>
+                  <option value="Manohar">Manohar</option>
+                  <option value="Sreekaran">Sreekaran</option>
+                  <option value="Sudheer">Sudheer</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Amount 1 (₹)</span>
+                <input type="number" id="splitAmt1" oninput="buildSplitSummary('in')" placeholder="1000"
+                       class="w-full text-xs font-bold p-2 border border-slate-300 rounded-lg" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Part 2 Mode</span>
+                <select id="splitMode2" onchange="buildSplitSummary('in')" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                  <option value="PPay">PPay</option>
+                  <option value="Cash">Cash</option>
+                  <option value="GPay">GPay</option>
+                  <option value="Bank Transfer">Bank</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Receiver 2</span>
+                <select id="splitReceiver2" onchange="buildSplitSummary('in')" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                  <option value="Manohar">Manohar</option>
+                  <option value="Sreekaran">Sreekaran</option>
+                  <option value="Sudheer">Sudheer</option>
+                  <option value="None">None (Cash)</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-slate-500">Amount 2 (₹)</span>
+                <input type="number" id="splitAmt2" oninput="buildSplitSummary('in')" placeholder="500"
+                       class="w-full text-xs font-bold p-2 border border-slate-300 rounded-lg" />
+              </div>
+            </div>
+
+            <div class="text-[11px] p-2 bg-white rounded-lg border border-emerald-100 flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Mode Preview:</span>
+              <span id="splitStringPreview" class="font-mono font-bold text-emerald-700">Cash (0)+ PPay to Manohar (0)</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Action item / Remarks</label>
+          <input type="text" id="inActionItem" placeholder="Optional notes"
+                 class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl" />
+        </div>
+
+        <div id="checkInStatusBox" class="p-3 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeCheckInModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+            Cancel
+          </button>
+          <button type="submit" id="checkInSubmitBtn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Register Guest</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EXTEND STAY MODAL (WITH DYNAMIC MODE SELECTOR & SPLITTER) -->
+  <div id="extendModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-plus text-indigo-600"></i> Extend Stay
+          </h2>
+          <p id="extendGuestSubtitle" class="text-xs text-slate-500">Updating stay duration</p>
+        </div>
+        <button type="button" onclick="closeExtendModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="extendForm" onsubmit="submitExtendStay(event)" class="space-y-3.5">
+        <input type="hidden" id="extRowIndex" />
+        <input type="hidden" id="extJoinedDate" />
+        <input type="hidden" id="extExistingPaid" />
+        <input type="hidden" id="extExistingBalance" />
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">New Vacated Date &amp; Time *</label>
+          <div class="grid grid-cols-5 gap-2">
+            <input type="date" id="extNewVacatedDate" required onchange="recalculateExtendDays()"
+                   class="col-span-3 text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            <input type="time" id="extNewVacatedTime" required
+                   class="col-span-2 text-xs font-semibold px-2 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <div class="bg-indigo-50 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-600">Updated Total Days:</span>
+          <span id="extTotalDaysBadge" class="font-mono font-black text-indigo-700 text-sm">--</span>
+        </div>
+
+        <!-- CAUTION DEPOSIT ADJUSTMENT BOX -->
+        <div id="extDepositAdjustBox" class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-900">
+              <input type="checkbox" id="extAdjustDepositToggle" onchange="onToggleDepositAdjustment()" class="rounded text-amber-600 focus:ring-0 cursor-pointer" />
+              <span>Adjust Caution Deposit to Rent?</span>
+            </label>
+            <span id="extAvailableDepositBadge" class="font-mono text-xs font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">Avail: ₹0</span>
+          </div>
+          <p id="extDepositNote" class="text-[11px] text-amber-700 hidden">
+            ✓ Deposit will be converted to rent paid.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Additional Rent Collected (₹)</label>
+          <input type="number" id="extAdditionalPaid" oninput="onExtPaidChange()" placeholder="0 if deferred"
+                 class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono text-emerald-700" />
+        </div>
+
+        <!-- EXTENSION PAYMENT MODE BOX (SINGLE VS SPLIT) -->
+        <div id="extPaymentModeBox" class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <label class="text-[11px] font-bold text-slate-700">Collection Mode</label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-indigo-700">
+              <input type="checkbox" id="extSplitToggle" onchange="toggleSplitPayment('ext')" class="rounded text-indigo-600 focus:ring-0 cursor-pointer" />
+              <span>Split Payment</span>
+            </label>
+          </div>
+
+          <!-- Single Mode -->
+          <div id="extSinglePaySection" class="grid grid-cols-2 gap-2">
+            <div>
+              <span class="text-[10px] font-bold text-slate-500">Mode</span>
+              <select id="extPayMode" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="Cash">Cash</option>
+                <option value="PPay">PPay (PhonePe)</option>
+                <option value="GPay">GPay (Google Pay)</option>
+                <option value="Paytm">Paytm</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-slate-500">Received By</span>
+              <select id="extPayReceiver" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="None">None (Cash)</option>
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Split Mode -->
+          <div id="extSplitPaySection" class="space-y-2 hidden">
+            <div class="grid grid-cols-3 gap-1.5">
+              <select id="extSplitMode1" onchange="buildSplitSummary('ext')" class="text-xs p-1.5 border border-slate-300 rounded bg-white">
+                <option value="Cash">Cash</option>
+                <option value="PPay">PPay</option>
+                <option value="GPay">GPay</option>
+              </select>
+              <select id="extSplitReceiver1" onchange="buildSplitSummary('ext')" class="text-xs p-1.5 border border-slate-300 rounded bg-white">
+                <option value="None">None</option>
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+              </select>
+              <input type="number" id="extSplitAmt1" oninput="buildSplitSummary('ext')" placeholder="Amt" class="text-xs p-1.5 border border-slate-300 rounded font-bold" />
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <select id="extSplitMode2" onchange="buildSplitSummary('ext')" class="text-xs p-1.5 border border-slate-300 rounded bg-white">
+                <option value="PPay">PPay</option>
+                <option value="Cash">Cash</option>
+                <option value="GPay">GPay</option>
+              </select>
+              <select id="extSplitReceiver2" onchange="buildSplitSummary('ext')" class="text-xs p-1.5 border border-slate-300 rounded bg-white">
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+                <option value="None">None</option>
+              </select>
+              <input type="number" id="extSplitAmt2" oninput="buildSplitSummary('ext')" placeholder="Amt" class="text-xs p-1.5 border border-slate-300 rounded font-bold" />
+            </div>
+            <p id="extSplitPreview" class="text-[10px] font-mono text-indigo-600 font-bold truncate"></p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Additional Balance Added (₹)</label>
+          <input type="number" id="extAdditionalBalance" placeholder="0 if settled"
+                 class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono text-amber-700" />
+        </div>
+
+        <div id="extendStatusBox" class="p-2.5 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" onclick="closeExtendModal()" class="flex-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs">Cancel</button>
+          <button type="submit" id="extSubmitBtn" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md">
+            Save Extension
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CHECKOUT / RETURN DEPOSIT MODAL (WITH BALANCE SETTLEMENT COLLECTION) -->
+  <div id="checkOutModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-right-from-bracket text-rose-600"></i> Guest Checkout
+          </h2>
+          <p id="checkoutGuestSubtitle" class="text-xs text-slate-500">Settle balance &amp; return deposit</p>
+        </div>
+        <button type="button" onclick="closeCheckOutModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="checkOutForm" onsubmit="submitCheckOut(event)" class="space-y-3.5">
+        <input type="hidden" id="coRowIndex" />
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Actual Vacated Date &amp; Time *</label>
+          <div class="grid grid-cols-5 gap-2">
+            <input type="date" id="coVacatedDate" required
+                   class="col-span-3 text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl focus:outline-none" />
+            <input type="time" id="coVacatedTime" required
+                   class="col-span-2 text-xs font-semibold px-2 py-2 border border-slate-300 rounded-xl focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- PENDING BALANCE COLLECTION BOX -->
+        <div id="coBalanceSection" class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-900">Pending Dues:</span>
+            <span id="coPendingDuesBadge" class="font-mono font-black text-amber-800 text-sm">₹0</span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">Collect Balance (₹) *</label>
+            <input type="number" id="coCollectedAmount" required placeholder="0"
+                   class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono text-emerald-700 bg-white" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 mb-1">Payment Mode</label>
+              <select id="coPayMode" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="Cash">Cash</option>
+                <option value="PPay">PPay (PhonePe)</option>
+                <option value="GPay">GPay (Google Pay)</option>
+                <option value="Paytm">Paytm</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 mb-1">Received By</label>
+              <select id="coPayReceiver" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="None">None (Cash)</option>
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- CAUTION DEPOSIT REFUND BOX -->
+        <div id="depositRefundSection" class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-700">Caution Deposit:</span>
+            <span id="coCautionDepositText" class="font-mono font-black text-slate-800">₹0</span>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Deposit Returned By *</label>
+            <select id="coReturnedBy" class="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl">
+              <option value="Manohar">Manohar</option>
+              <option value="Sudheer">Sudheer</option>
+              <option value="Sreekaran">Sreekaran</option>
+              <option value="Cash">Cash</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Checkout Note</label>
+          <input type="text" id="coNote" placeholder="e.g. Key received, balance settled"
+                 class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl" />
+        </div>
+
+        <div id="checkoutStatusBox" class="p-2.5 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" onclick="closeCheckOutModal()" class="flex-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs">Cancel</button>
+          <button type="submit" id="coSubmitBtn" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md">
+            Complete Checkout
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN WRAPPER -->
+  <div class="max-w-4xl mx-auto px-4 pt-4 sm:pt-8">
+    
+    <!-- HEADER -->
+    <header class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <a href="index.html" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
+            <i class="fa-solid fa-arrow-left"></i> Home
+          </a>
+          <span class="text-slate-300">&bull;</span>
+          <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Short Stays</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+          <i class="fa-solid fa-bed text-emerald-600"></i> Daily Staying Guests
+        </h1>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="openCheckInModal()" class="px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-plus"></i>
+          <span>Check-in Guest</span>
+        </button>
+
+        <select id="monthSelect" onchange="loadDailyGuests()" class="text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-700">
+          <option value="October 2026">October 2026</option>
+        </select>
+        <button onclick="logoutApp()" class="p-2 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition" title="Lock">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- METRICS & CONTROLS -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Viewing:</span>
+        <button onclick="filterList('active')" id="btnTabActive" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-sm">
+          Active Stays (<span id="activeCountBadge">0</span>)
+        </button>
+        <button onclick="filterList('completed')" id="btnTabCompleted" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 text-slate-600">
+          Completed / Vacated (<span id="completedCountBadge">0</span>)
+        </button>
+      </div>
+
+      <div class="relative w-full sm:w-48">
+        <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input type="text" id="guestSearchInput" oninput="renderGuests()" placeholder="Search room or name..."
+               class="w-full pl-7 pr-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl focus:outline-none" />
+      </div>
+    </div>
+
+    <!-- GUESTS LIST CONTAINER -->
+    <div id="guestsListContainer" class="space-y-3">
+      <div class="text-center py-12 text-slate-400 text-xs font-semibold">
+        <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Loading daily guests...
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let allGuests = [];
+    let currentFilter = 'active';
+
+    function getCurrentTimeHHMM() {
+      const now = new Date();
+      return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    }
+
+    function formatTime12h(timeStr) {
+      if (!timeStr) return "";
+      const [h, m] = timeStr.split(":");
+      let hour = parseInt(h, 10);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      return `${hour}:${m} ${ampm}`;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const today = todayISO();
+      const tomorrow = addDaysISO(1);
+      
+      document.getElementById("inJoinedDate").value = today;
+      document.getElementById("inJoinedTime").value = getCurrentTimeHHMM();
+      document.getElementById("inVacatedDate").value = tomorrow;
+      document.getElementById("inVacatedTime").value = "11:00";
+      recalculateCheckInDays();
+
+      if (isAuthenticated()) {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadDailyGuests();
+        });
+      } else {
+        document.getElementById("pinLockModal").classList.remove("hidden");
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const prefillRoom = urlParams.get('room');
+      const prefillSharing = urlParams.get('sharing');
+
+      if (prefillRoom) {
+        openCheckInModal();
+        document.getElementById("inRoom").value = prefillRoom;
+        if (prefillSharing) {
+          document.getElementById("inSharing").value = `${prefillSharing} sharing`;
+        }
+      }
+    });
+
+    function unlockApp() {
+      verifyStaffPin("staffPinInput", "pinErrorMsg", () => {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadDailyGuests();
+        });
+      });
+    }
+
+    function filterList(type) {
+      currentFilter = type;
+      const btnActive = document.getElementById("btnTabActive");
+      const btnCompleted = document.getElementById("btnTabCompleted");
+
+      if (type === 'active') {
+        btnActive.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-sm";
+        btnCompleted.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 text-slate-600";
+      } else {
+        btnCompleted.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-sm";
+        btnActive.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 text-slate-600";
+      }
+      renderGuests();
+    }
+
+    async function loadDailyGuests(retries = 2, forceRefresh = false) {
+      const month = document.getElementById("monthSelect").value;
+      const container = document.getElementById("guestsListContainer");
+      container.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Loading daily guests...</div>`;
+
+      try {
+        const json = await apiGet("getDailyGuests", { month: month, forceRefresh: forceRefresh ? "true" : "" });
+        allGuests = json.guests || [];
+        renderGuests();
+      } catch (err) {
+        container.innerHTML = `<p class="text-xs text-rose-500 font-semibold p-4 bg-rose-50 rounded-2xl">Error: ${esc(err.message)}</p>`;
+      }
+    }
+
+    function parseSafeDate(dateString) {
+      if (!dateString) return null;
+      const cleanDatePart = String(dateString).trim().split(" ")[0];
+      const parsed = new Date(cleanDatePart);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function isGuestActive(g, today) {
+      const actionItem = (g.actionItem || "").toLowerCase();
+      const returnedBy = (g.returnedBy || "").trim();
+
+      if (actionItem.includes("manually ended stay")) {
+        return false;
+      }
+
+      if (returnedBy !== "" && returnedBy !== "Adjusted to Rent") {
+        return false;
+      }
+
+      if (g.vacatedDate) {
+        const vacDate = parseSafeDate(g.vacatedDate);
+        if (vacDate) {
+          vacDate.setHours(0, 0, 0, 0);
+
+          if (today <= vacDate) {
+            return true;
+          }
+
+          const cutoffDate = new Date(vacDate);
+          cutoffDate.setDate(cutoffDate.getDate() + 3);
+          return today <= cutoffDate;
+        }
+      }
+
+      return true;
+    }
+
+    function renderGuests() {
+      const container = document.getElementById("guestsListContainer");
+      const query = (document.getElementById("guestSearchInput").value || "").toLowerCase().trim();
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const activeList = allGuests.filter(g => isGuestActive(g, today));
+      const completedList = allGuests.filter(g => !isGuestActive(g, today));
+
+      document.getElementById("activeCountBadge").innerText = activeList.length;
+      document.getElementById("completedCountBadge").innerText = completedList.length;
+
+      let listToRender = (currentFilter === 'active') ? activeList : completedList;
+
+      if (query) {
+        listToRender = listToRender.filter(g => 
+          g.roomNumber.toLowerCase().includes(query) || 
+          g.name.toLowerCase().includes(query) ||
+          g.mobile.includes(query)
+        );
+      }
+
+      if (listToRender.length === 0) {
+        container.innerHTML = `<div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400 font-semibold">No ${currentFilter} daily guests found.</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      listToRender.forEach(g => {
+        const card = document.createElement("div");
+        card.className = "p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4";
+
+        const hasBalance = g.balance > 0;
+        const depositText = g.cautionDeposit > 0 ? `Deposit: ₹${g.cautionDeposit}` : `No Deposit`;
+
+        let graceTag = "";
+        if (!g.returnedBy && g.vacatedDate) {
+          const vDate = parseSafeDate(g.vacatedDate);
+          if (vDate) {
+            vDate.setHours(0, 0, 0, 0);
+            if (today > vDate) {
+              graceTag = `<span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Vacate Overdue</span>`;
+            }
+          }
+        }
+
+        let actionButtons = "";
+        if (currentFilter === 'active') {
+          actionButtons = `
+            <div class="flex items-center gap-2">
+              <button onclick="openExtendModal(${g.rowIndex})" class="px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-calendar-plus"></i> Extend
+              </button>
+              <button onclick="openCheckOutModal(${g.rowIndex})" class="px-3 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-right-from-bracket"></i> Check-Out
+              </button>
+            </div>
+          `;
+        } else {
+          actionButtons = `
+            <div class="text-right">
+              <span class="px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg">Settled (${g.returnedBy || 'Completed'})</span>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-black text-slate-900">Room ${esc(g.roomNumber)}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">${esc(g.sharing)}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-mono">${g.days} Days Stay</span>
+              ${graceTag}
+            </div>
+            <p class="text-xs font-bold text-slate-800 mt-1 flex items-center gap-2">
+              <i class="fa-solid fa-user text-slate-400 text-xs"></i> ${esc(g.name)}
+              <span class="text-[11px] text-slate-400 font-normal">(${esc(g.mobile)})</span>
+            </p>
+            <p class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span class="font-medium text-slate-700">${esc(g.joinedDate)}</span>
+              <span class="text-slate-400">&rarr;</span>
+              <span class="font-bold text-slate-900">${esc(g.vacatedDate)}</span>
+              <span class="text-slate-300">&bull;</span>
+              <span class="text-slate-400">${depositText}</span>
+            </p>
+            ${g.actionItem ? `<p class="text-[10px] text-slate-400 italic mt-1">${esc(g.actionItem)}</p>` : ''}
+          </div>
+
+          <div class="flex flex-col sm:items-end gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-black rounded-lg">Paid: ₹${g.paid}</span>
+              ${hasBalance 
+                ? `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-lg">Bal: ₹${g.balance}</span>`
+                : `<span class="px-2.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-lg">Cleared</span>`
+              }
+            </div>
+            ${actionButtons}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // ==========================================
+    // AUTO DAY & BALANCE CALCULATIONS
+    // ==========================================
+    function calculateDaysBetween(startDateStr, endDateStr) {
+      if (!startDateStr || !endDateStr) return 1;
+      const start = new Date(startDateStr);
+      const end = new Date(endDateStr);
+      const diffTime = end - start;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 1;
+    }
+
+    function recalculateCheckInDays() {
+      const joined = document.getElementById("inJoinedDate").value;
+      const vacated = document.getElementById("inVacatedDate").value;
+      const days = calculateDaysBetween(joined, vacated);
+      document.getElementById("calculatedDaysBadge").innerText = `${days} Day${days > 1 ? 's' : ''}`;
+      return days;
+    }
+
+    function recalculateBalance() {
+      const total = parseFloat(document.getElementById("inTotalRent").value) || 0;
+      const paid = parseFloat(document.getElementById("inPaid").value) || 0;
+      const bal = Math.max(0, total - paid);
+      document.getElementById("inBalance").value = bal;
+    }
+
+    function recalculateExtendDays() {
+      const joined = (document.getElementById("extJoinedDate").value || "").split(" ")[0];
+      const newVacated = document.getElementById("extNewVacatedDate").value;
+      const totalDays = calculateDaysBetween(joined, newVacated);
+      document.getElementById("extTotalDaysBadge").innerText = `${totalDays} Days`;
+      return totalDays;
+    }
+
+    // ==========================================
+    // SPLIT PAYMENT TECHNIQUE (GENERIC)
+    // ==========================================
+    function toggleSplitPayment(prefix) {
+      const isSplit = document.getElementById(prefix === 'in' ? "splitPaymentToggle" : "extSplitToggle").checked;
+      const singleSection = document.getElementById(prefix === 'in' ? "inSinglePaySection" : "extSinglePaySection");
+      const splitSection = document.getElementById(prefix === 'in' ? "inSplitPaySection" : "extSplitPaySection");
+
+      if (isSplit) {
+        singleSection.classList.add("hidden");
+        splitSection.classList.remove("hidden");
+        const currentPaid = parseFloat(document.getElementById(prefix === 'in' ? "inPaid" : "extAdditionalPaid").value) || 0;
+        document.getElementById(prefix === 'in' ? "splitAmt1" : "extSplitAmt1").value = currentPaid;
+        document.getElementById(prefix === 'in' ? "splitAmt2" : "extSplitAmt2").value = "";
+        buildSplitSummary(prefix);
+      } else {
+        singleSection.classList.remove("hidden");
+        splitSection.classList.add("hidden");
+      }
+    }
+
+    function formatPart(mode, receiver, amt) {
+      const a = amt || 0;
+      if (receiver && receiver !== "None" && mode !== "Cash") {
+        return `${mode} to ${receiver} (${a})`;
+      }
+      return `${mode} (${a})`;
+    }
+
+    function buildSplitSummary(prefix) {
+      const p = prefix === 'in' ? '' : 'ext';
+      const mode1 = document.getElementById(prefix === 'in' ? "splitMode1" : "extSplitMode1").value;
+      const rec1 = document.getElementById(prefix === 'in' ? "splitReceiver1" : "extSplitReceiver1").value;
+      const amt1 = parseFloat(document.getElementById(prefix === 'in' ? "splitAmt1" : "extSplitAmt1").value) || 0;
+
+      const mode2 = document.getElementById(prefix === 'in' ? "splitMode2" : "extSplitMode2").value;
+      const rec2 = document.getElementById(prefix === 'in' ? "splitReceiver2" : "extSplitReceiver2").value;
+      const amt2 = parseFloat(document.getElementById(prefix === 'in' ? "splitAmt2" : "extSplitAmt2").value) || 0;
+
+      const part1Str = formatPart(mode1, rec1, amt1);
+      const part2Str = formatPart(mode2, rec2, amt2);
+
+      const combined = `${part1Str}+ ${part2Str}`;
+
+      if (prefix === 'in') {
+        document.getElementById("splitStringPreview").innerText = combined;
+        document.getElementById("inPaid").value = amt1 + amt2;
+        recalculateBalance();
+      } else {
+        document.getElementById("extSplitPreview").innerText = combined;
+        document.getElementById("extAdditionalPaid").value = amt1 + amt2;
+      }
+      return combined;
+    }
+
+    function onExtPaidChange() {
+      const amt = parseFloat(document.getElementById("extAdditionalPaid").value) || 0;
+      const box = document.getElementById("extPaymentModeBox");
+      const isDepositChecked = document.getElementById("extAdjustDepositToggle").checked;
+
+      if (amt > 0 && !isDepositChecked) {
+        box.classList.remove("hidden");
+      } else {
+        box.classList.add("hidden");
+      }
+    }
+
+    // ==========================================
+    // MODAL OPEN / CLOSE HANDLERS
+    // ==========================================
+    function openCheckInModal() {
+      document.getElementById("checkInModal").classList.remove("hidden");
+      document.getElementById("inJoinedTime").value = getCurrentTimeHHMM();
+      document.getElementById("inRoom").focus();
+    }
+
+    function closeCheckInModal() {
+      document.getElementById("checkInModal").classList.add("hidden");
+      document.getElementById("checkInForm").reset();
+      document.getElementById("checkInStatusBox").classList.add("hidden");
+      document.getElementById("splitPaymentToggle").checked = false;
+      document.getElementById("inSinglePaySection").classList.remove("hidden");
+      document.getElementById("inSplitPaySection").classList.add("hidden");
+      const today = todayISO();
+      const tomorrow = addDaysISO(1);
+      document.getElementById("inJoinedDate").value = today;
+      document.getElementById("inJoinedTime").value = getCurrentTimeHHMM();
+      document.getElementById("inVacatedDate").value = tomorrow;
+      document.getElementById("inVacatedTime").value = "11:00";
+      recalculateCheckInDays();
+    }
+
+    function openExtendModal(rowIndex) {
+      const guest = allGuests.find(g => g.rowIndex === rowIndex);
+      if (!guest) return;
+
+      document.getElementById("extRowIndex").value = guest.rowIndex;
+      document.getElementById("extJoinedDate").value = guest.joinedDate;
+      document.getElementById("extExistingPaid").value = guest.paid;
+      document.getElementById("extExistingBalance").value = guest.balance;
+
+      document.getElementById("extendGuestSubtitle").innerText = `Room ${guest.roomNumber} - ${guest.name} (Current: ${guest.vacatedDate})`;
+
+      const depositBox = document.getElementById("extDepositAdjustBox");
+      const depositToggle = document.getElementById("extAdjustDepositToggle");
+      depositToggle.checked = false;
+      document.getElementById("extDepositNote").classList.add("hidden");
+
+      if (guest.cautionDeposit && guest.cautionDeposit > 0 && (!guest.returnedBy || guest.returnedBy === "")) {
+        depositBox.classList.remove("hidden");
+        document.getElementById("extAvailableDepositBadge").innerText = `Avail: ₹${guest.cautionDeposit}`;
+        depositBox.dataset.availableDeposit = guest.cautionDeposit;
+      } else {
+        depositBox.classList.add("hidden");
+        depositBox.dataset.availableDeposit = "0";
+      }
+
+      const baseVacDate = parseSafeDate(guest.vacatedDate) || new Date();
+      const minDateObj = new Date(baseVacDate.getTime() + 86400000);
+      const minDateStr = toLocalISO(minDateObj);
+
+      const dateInput = document.getElementById("extNewVacatedDate");
+      dateInput.min = minDateStr;
+      dateInput.value = minDateStr;
+      document.getElementById("extNewVacatedTime").value = "11:00";
+      dateInput.dataset.previousVacated = guest.vacatedDate;
+
+      // Reset payment fields
+      document.getElementById("extAdditionalPaid").value = "";
+      document.getElementById("extAdditionalBalance").value = "";
+      document.getElementById("extSplitToggle").checked = false;
+      document.getElementById("extSinglePaySection").classList.remove("hidden");
+      document.getElementById("extSplitPaySection").classList.add("hidden");
+      document.getElementById("extPaymentModeBox").classList.add("hidden");
+
+      recalculateExtendDays();
+      document.getElementById("extendModal").classList.remove("hidden");
+    }
+
+    function onToggleDepositAdjustment() {
+      const isChecked = document.getElementById("extAdjustDepositToggle").checked;
+      const available = parseFloat(document.getElementById("extDepositAdjustBox").dataset.availableDeposit) || 0;
+      const additionalPaidInput = document.getElementById("extAdditionalPaid");
+      const note = document.getElementById("extDepositNote");
+      const modeBox = document.getElementById("extPaymentModeBox");
+
+      if (isChecked) {
+        additionalPaidInput.value = available;
+        modeBox.classList.add("hidden");
+        note.classList.remove("hidden");
+      } else {
+        additionalPaidInput.value = "";
+        note.classList.add("hidden");
+        onExtPaidChange();
+      }
+    }
+
+    function closeExtendModal() {
+      document.getElementById("extendModal").classList.add("hidden");
+      document.getElementById("extendForm").reset();
+      document.getElementById("extendStatusBox").classList.add("hidden");
+    }
+
+    function openCheckOutModal(rowIndex) {
+      const guest = allGuests.find(g => g.rowIndex === rowIndex);
+      if (!guest) return;
+
+      document.getElementById("coRowIndex").value = guest.rowIndex;
+      document.getElementById("checkoutGuestSubtitle").innerText = `Room ${guest.roomNumber} - ${guest.name}`;
+      document.getElementById("coVacatedDate").value = todayISO();
+      document.getElementById("coVacatedTime").value = getCurrentTimeHHMM();
+
+      // Configure Balance Section
+      const balSection = document.getElementById("coBalanceSection");
+      const guestBal = Number(guest.balance) || 0;
+
+      if (guestBal > 0) {
+        balSection.classList.remove("hidden");
+        document.getElementById("coPendingDuesBadge").innerText = `₹${guestBal}`;
+        document.getElementById("coCollectedAmount").value = guestBal;
+      } else {
+        balSection.classList.add("hidden");
+        document.getElementById("coCollectedAmount").value = "0";
+      }
+
+      // Configure Deposit Section
+      const retSelect = document.getElementById("coReturnedBy");
+      if (guest.returnedBy === "Adjusted to Rent" || Number(guest.cautionDeposit) === 0) {
+        document.getElementById("coCautionDepositText").innerText = `₹0 (Deposit already adjusted)`;
+        retSelect.innerHTML = `
+          <option value="Deposit Adjusted">Deposit Adjusted</option>
+          <option value="No Deposit to Refund">No Deposit to Refund</option>
+        `;
+      } else {
+        document.getElementById("coCautionDepositText").innerText = `₹${guest.cautionDeposit}`;
+        retSelect.innerHTML = `
+          <option value="Manohar">Manohar</option>
+          <option value="Sudheer">Sudheer</option>
+          <option value="Sreekaran">Sreekaran</option>
+          <option value="Cash">Cash</option>
+          <option value="No Deposit Refunded">No Deposit Refunded</option>
+        `;
+      }
+
+      document.getElementById("checkOutModal").classList.remove("hidden");
+    }
+
+    function closeCheckOutModal() {
+      document.getElementById("checkOutModal").classList.add("hidden");
+      document.getElementById("checkOutForm").reset();
+      document.getElementById("checkoutStatusBox").classList.add("hidden");
+    }
+
+    // ==========================================
+    // SAFE FETCH HELPER
+    // ==========================================
+    async function safePostToSheet(payload, defaultSuccessMessage) {
+      // apiPost only resolves when the server confirms success; anything else throws
+      const json = await apiPost(payload);
+      if (!json.message) json.message = defaultSuccessMessage;
+      return json;
+    }
+
+    // ==========================================
+    // FORM SUBMISSIONS
+    // ==========================================
+    async function submitCheckIn(e) {
+      e.preventDefault();
+      const btn = document.getElementById("checkInSubmitBtn");
+      const statusBox = document.getElementById("checkInStatusBox");
+      const days = recalculateCheckInDays();
+
+      const isSplit = document.getElementById("splitPaymentToggle").checked;
+      let finalModeString = "";
+
+      if (isSplit) {
+        finalModeString = buildSplitSummary('in');
+      } else {
+        const selectedMode = document.getElementById("payMode").value;
+        const selectedReceiver = document.getElementById("payReceiver").value;
+        if (selectedReceiver && selectedReceiver !== "None" && selectedMode !== "Cash") {
+          finalModeString = `${selectedMode} to ${selectedReceiver} (${document.getElementById("inPaid").value})`;
+        } else {
+          finalModeString = `${selectedMode} (${document.getElementById("inPaid").value})`;
+        }
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Registering...`;
+      statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = "Writing guest details to Daily Staying sheet...";
+
+      const guestName = document.getElementById("inName").value.trim();
+      const roomNum = document.getElementById("inRoom").value.trim();
+
+      const joinDate = document.getElementById("inJoinedDate").value;
+      const joinTime = formatTime12h(document.getElementById("inJoinedTime").value);
+      const vacDate = document.getElementById("inVacatedDate").value;
+      const vacTime = formatTime12h(document.getElementById("inVacatedTime").value);
+
+      const fullJoined = joinTime ? `${joinDate} ${joinTime}` : joinDate;
+      const fullVacated = vacTime ? `${vacDate} ${vacTime}` : vacDate;
+
+      const payload = {
+        action: "checkInDailyGuest",
+        month: document.getElementById("monthSelect").value,
+        roomNumber: roomNum,
+        name: guestName,
+        mobile: document.getElementById("inMobile").value.trim(),
+        sharing: document.getElementById("inSharing").value,
+        days: days,
+        paid: document.getElementById("inPaid").value,
+        balance: document.getElementById("inBalance").value,
+        joinedDate: fullJoined,
+        vacatedDate: fullVacated,
+        cautionDeposit: document.getElementById("inCaution").value || 0,
+        mode: finalModeString,
+        actionItem: document.getElementById("inActionItem").value.trim()
+      };
+
+      try {
+        const result = await safePostToSheet(payload, `Guest ${guestName} registered in Room ${roomNum}!`);
+        
+        statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(result.message)}`;
+        setTimeout(() => {
+          closeCheckInModal();
+          loadDailyGuests(2, true);
+        }, 1000);
+      } catch (err) {
+        statusBox.className = "p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Register Guest</span>`;
+      }
+    }
+
+    async function submitExtendStay(e) {
+      e.preventDefault();
+      const btn = document.getElementById("extSubmitBtn");
+      const statusBox = document.getElementById("extendStatusBox");
+      const dateInput = document.getElementById("extNewVacatedDate");
+      const newVacDate = dateInput.value;
+      const prevVacDate = dateInput.dataset.previousVacated;
+
+      const cleanPrevDate = (prevVacDate || "").split(" ")[0];
+      if (newVacDate <= cleanPrevDate) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = `Invalid date! New vacating date must be after ${cleanPrevDate}.`;
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...`;
+      statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = "Updating stay duration in sheet...";
+
+      const totalDays = recalculateExtendDays();
+      const existingPaid = parseFloat(document.getElementById("extExistingPaid").value) || 0;
+      const additionalPaid = parseFloat(document.getElementById("extAdditionalPaid").value) || 0;
+      const existingBalance = parseFloat(document.getElementById("extExistingBalance").value) || 0;
+      const additionalBalance = parseFloat(document.getElementById("extAdditionalBalance").value) || 0;
+
+      const isDepositAdjusted = document.getElementById("extAdjustDepositToggle").checked;
+      const depositAdjustAmt = isDepositAdjusted ? (parseFloat(document.getElementById("extDepositAdjustBox").dataset.availableDeposit) || 0) : 0;
+
+      const newVacTime = formatTime12h(document.getElementById("extNewVacatedTime").value);
+      const fullNewVacated = newVacTime ? `${newVacDate} ${newVacTime}` : newVacDate;
+
+      // Determine Extension Payment Mode
+      let additionalModeStr = "";
+      if (isDepositAdjusted) {
+        additionalModeStr = "Deposit Adjusted";
+      } else if (additionalPaid > 0) {
+        const isSplit = document.getElementById("extSplitToggle").checked;
+        if (isSplit) {
+          additionalModeStr = buildSplitSummary('ext');
+        } else {
+          const mode = document.getElementById("extPayMode").value;
+          const rec = document.getElementById("extPayReceiver").value;
+          if (rec && rec !== "None" && mode !== "Cash") {
+            additionalModeStr = `${mode} to ${rec} (${additionalPaid})`;
+          } else {
+            additionalModeStr = `${mode} (${additionalPaid})`;
+          }
+        }
+      }
+
+      const payload = {
+        action: "extendDailyStay",
+        month: document.getElementById("monthSelect").value,
+        rowIndex: document.getElementById("extRowIndex").value,
+        newVacatedDate: fullNewVacated,
+        newDays: totalDays,
+        guestName: (allGuests.find(g => String(g.rowIndex) === String(document.getElementById("extRowIndex").value)) || {}).name,
+        roomNumber: (allGuests.find(g => String(g.rowIndex) === String(document.getElementById("extRowIndex").value)) || {}).roomNumber,
+        additionalPaid: additionalPaid,
+        additionalBalance: additionalBalance,
+        additionalMode: additionalModeStr,
+        depositAdjustedAmount: depositAdjustAmt
+      };
+
+      try {
+        const result = await safePostToSheet(payload, `Stay extended till ${fullNewVacated}!`);
+
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(result.message)}`;
+        setTimeout(() => {
+          closeExtendModal();
+          loadDailyGuests(2, true);
+        }, 1000);
+      } catch (err) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `Save Extension`;
+      }
+    }
+
+    async function submitCheckOut(e) {
+      e.preventDefault();
+      const btn = document.getElementById("coSubmitBtn");
+      const statusBox = document.getElementById("checkoutStatusBox");
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Settling...`;
+      statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = "Recording checkout and balance collection...";
+
+      const vacDate = document.getElementById("coVacatedDate").value;
+      const vacTime = formatTime12h(document.getElementById("coVacatedTime").value);
+      const fullVacated = vacTime ? `${vacDate} ${vacTime}` : vacDate;
+
+      // Handle Collected Balance
+      const balCollected = parseFloat(document.getElementById("coCollectedAmount").value) || 0;
+      let balModeStr = "";
+      if (balCollected > 0) {
+        const mode = document.getElementById("coPayMode").value;
+        const rec = document.getElementById("coPayReceiver").value;
+        if (rec && rec !== "None" && mode !== "Cash") {
+          balModeStr = `${mode} to ${rec} (${balCollected})`;
+        } else {
+          balModeStr = `${mode} (${balCollected})`;
+        }
+      }
+
+      const payload = {
+        action: "checkOutDailyGuest",
+        month: document.getElementById("monthSelect").value,
+        rowIndex: document.getElementById("coRowIndex").value,
+        guestName: (allGuests.find(g => String(g.rowIndex) === String(document.getElementById("coRowIndex").value)) || {}).name,
+        roomNumber: (allGuests.find(g => String(g.rowIndex) === String(document.getElementById("coRowIndex").value)) || {}).roomNumber,
+        vacatedDate: fullVacated,
+        balanceCollected: balCollected,
+        balancePaymentMode: balModeStr,
+        returnedBy: document.getElementById("coReturnedBy").value,
+        checkoutNote: document.getElementById("coNote").value.trim()
+      };
+
+      try {
+        const result = await safePostToSheet(payload, "Guest checkout & balance settled successfully!");
+
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(result.message)}`;
+        setTimeout(() => {
+          closeCheckOutModal();
+          loadDailyGuests(2, true);
+        }, 1000);
+      } catch (err) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `Complete Checkout`;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Elysium PG - Operations Portal</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="auth.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-12">
+
+  <div class="max-w-4xl mx-auto px-4 pt-6 sm:pt-10">
+    
+    <header class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 mb-6 flex items-center justify-between">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 mb-2">
+          <i class="fa-solid fa-circle text-[8px] text-emerald-500 animate-pulse"></i> Operational &bull; 42 Rooms
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Elysium PG Hub
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-2">
+          <span>Logged in as:</span>
+          <span id="userGreeting" class="font-bold text-slate-800">User</span>
+          <span id="userRoleBadge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-700">Role</span>
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a id="masterAdminLink" href="users.html" class="hidden p-3 text-sm font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-2xl transition" title="User Management">
+          <i class="fa-solid fa-user-gear"></i>
+        </a>
+        <button onclick="logoutApp()" class="p-3 text-sm font-semibold bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl transition" title="Log Out">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-center">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Rooms</p>
+        <p class="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">42</p>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-center">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Floors</p>
+        <p class="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">1 – 6</p>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-center">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">System</p>
+        <p class="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">Cloud</p>
+      </div>
+    </div>
+
+    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Management Modules</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+      <a href="vacancies.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-rose-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-door-open"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-rose-600 transition">Vacancies &amp; Availability</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full shrink-0">Live</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Live beds available now and upcoming vacancies with departure dates.</p>
+        </div>
+      </a>
+      
+      <a href="rent.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-indigo-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition">Rent &amp; Dues Ledger</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">Active</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Select room, choose specific resident, verify rent, and log payments.</p>
+        </div>
+      </a>
+
+      <a href="new_resident.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-indigo-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition">New Resident Check-in</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full shrink-0">New</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Register new tenants, capture advance/rent, and upload Aadhaar to Drive.</p>
+        </div>
+      </a>
+
+      <a href="walkins.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-indigo-400 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-person-walking-arrow-right"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-base group-hover:text-indigo-600 transition">Walk-in Inquiries</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full shrink-0">Inquiry</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Track inquiries, quotes & sharing requests.</p>
+        </div>
+      </a>
+
+      <a href="daily_staying.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-emerald-600 transition">Daily Staying</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">Short Stay</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Manage day-wise guests, auto-calculate stay duration, and process refunds.</p>
+        </div>
+      </a>
+
+      <a href="expenses.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-teal-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-teal-600 transition">Expenses</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full shrink-0">Expenses</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Track groceries, utilities, and partner cash outflow.</p>
+        </div>
+      </a>
+
+      <a href="resident_details.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-teal-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-user-pen"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-teal-600 transition">Resident &amp; Room Details</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full shrink-0">Specs</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Edit fixed rents, advances, phone numbers, and configure room AC usage.</p>
+        </div>
+      </a>
+      
+      <a href="settlements.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-scale-balanced"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-emerald-600 transition">Cashflow &amp; Settlements</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">Audit</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Multi-month partner balances, collections, expenses, and advance returns.</p>
+        </div>
+      </a>
+      
+      <a id="aadharTile" href="aadhar.html" class="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-id-card"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-blue-600 transition">Document Uploader</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">Active</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Upload Aadhaar, PAN, and agreements to Room 101–607 folders.</p>
+        </div>
+      </a>
+
+      <!-- 10. Partner & User Management (Master Admin Only) -->
+      <a id="usersCardTile" href="users.html" class="hidden group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-purple-500 hover:shadow-md transition flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-800 group-hover:text-purple-600 transition">User Management</h3>
+            <span class="text-[10px] uppercase font-bold tracking-wide bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full shrink-0">Master</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Add partner accounts, configure viewer permissions, and set security PINs.</p>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fa-brands fa-google-drive text-2xl text-blue-600"></i>
+        <div>
+          <p class="text-xs font-bold text-slate-800">Master Google Drive Folder</p>
+          <p class="text-[11px] text-slate-500">View centralized Elysium PG folders directly in Google Drive</p>
+        </div>
+      </div>
+      <a href="https://drive.google.com" target="_blank" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition">
+        Open Drive
+      </a>
+    </div>
+
+  </div>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const user = getAuthUser();
+      const role = getAuthRole();
+      
+      document.getElementById("userGreeting").innerText = user;
+      
+      const badge = document.getElementById("userRoleBadge");
+      if (role === "MASTER_ADMIN") {
+        badge.innerText = "Master Admin";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 border border-purple-200";
+        document.getElementById("masterAdminLink").classList.remove("hidden");
+        document.getElementById("usersCardTile").classList.remove("hidden");
+      } else if (role === "ADMIN") {
+        badge.innerText = "Admin";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200";
+      } else if (role === "VIEWER") {
+        const aadharTile = document.getElementById("aadharTile");
+        if (aadharTile) aadharTile.classList.add("hidden");
+        badge.innerText = "Viewer (Read-Only)";
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200";
+      }
+    });
+  </script>
+</body>
+</html>

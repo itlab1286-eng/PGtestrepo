@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Elysium PG - Rent & Dues Ledger</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="auth.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="receipt.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    .room-btn.active { background-color: #4f46e5; color: #ffffff; border-color: #4338ca; }
+    .resident-card.active { border-color: #4f46e5; background-color: #eef2ff; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
+
+  <!-- PIN LOCK SCREEN -->
+  <div id="pinLockModal" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
+      <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900 mb-1">Staff Verification</h2>
+      <p class="text-sm text-slate-500 mb-6">Enter PIN to access Rent Ledger</p>
+      
+      <div class="flex justify-center mb-6">
+        <input type="password" maxlength="6" id="staffPinInput" 
+               class="w-44 text-center text-3xl tracking-widest font-mono py-2 border-2 border-slate-300 rounded-xl focus:border-indigo-600 focus:outline-none" 
+               placeholder="••••" autofocus />
+      </div>
+
+      <p id="pinErrorMsg" class="text-xs text-red-500 font-semibold mb-4 hidden">Invalid PIN.</p>
+
+      <button onclick="unlockApp()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-500/30 transition">
+        Unlock Ledger
+      </button>
+    </div>
+  </div>
+
+  <!-- ADVANCE RETURN SETTLEMENT MODAL -->
+  <div id="advanceReturnModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-hand-holding-dollar text-rose-600"></i> Advance Settlement
+        </h3>
+        <button type="button" onclick="closeAdvanceModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <span class="text-slate-500 font-semibold">Resident:</span>
+          <span id="advModalResidentName" class="font-bold text-slate-900 text-sm block"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-600 font-bold mb-1">Total Advance (₹)</label>
+            <input type="number" id="advTotalAmount" oninput="calculateNetRefund()" 
+                   class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-slate-800" />
+          </div>
+          <div>
+            <label class="block text-slate-600 font-bold mb-1">Maint. Deduction (₹)</label>
+            <input type="number" id="advMaintenanceDeduction" value="1000" oninput="calculateNetRefund()" 
+                   class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-rose-600" />
+          </div>
+        </div>
+        
+        <div class="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between">
+          <div>
+            <span class="font-bold text-rose-900 block">Net Refund Amount:</span>
+            <span class="text-[10px] text-rose-600 font-medium">Recorded as negative value</span>
+          </div>
+          <span id="advNetRefundDisplay" class="font-mono font-black text-rose-700 text-lg">-₹2,000</span>
+        </div>
+
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Advance Returned By *</label>
+          <select id="advReturnedBySelect" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-bold bg-white text-slate-800">
+            <option value="Sreekaran">Sreekaran</option>
+            <option value="Manohar">Manohar</option>
+            <option value="Sudheer">Sudheer</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Vacating Date *</label>
+          <input type="date" id="advVacatingDate" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800" />
+        </div>
+
+        <div id="advStatusBox" class="p-2.5 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeAdvanceModal()" class="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+            Cancel
+          </button>
+          <button type="button" onclick="submitAdvanceReturn()" id="advSubmitBtn" class="w-2/3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Confirm &amp; Write (-₹)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLLECT ADVANCE MODAL -->
+  <div id="collectAdvanceModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-hand-holding-dollar text-emerald-600"></i> Collect Advance
+        </h3>
+        <button type="button" onclick="closeCollectAdvanceModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="submitCollectAdvance(event)" class="space-y-3.5 text-xs">
+        <div>
+          <span class="text-slate-500 font-semibold">Resident:</span>
+          <span id="colAdvResidentName" class="font-bold text-slate-900 text-sm block"></span>
+          <span id="colAdvStatusText" class="text-[11px] text-slate-400"></span>
+        </div>
+
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Advance Amount Received (₹) *</label>
+          <input type="number" id="colAdvAmount" required placeholder="e.g. 2000" min="1"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-emerald-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Received By / Mode *</label>
+          <select id="colAdvReceiver" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-bold bg-white text-slate-800">
+            <option value="Sreekaran">Sreekaran</option>
+            <option value="Manohar">Manohar</option>
+            <option value="Sudheer">Sudheer</option>
+            <option value="Office Account">Office Account</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+
+        <div id="colAdvStatusBox" class="p-2.5 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeCollectAdvanceModal()" class="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition">
+            Cancel
+          </button>
+          <button type="submit" id="colAdvSubmitBtn" class="w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Save Advance</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ROOM SHIFT TRANSFER MODAL -->
+  <div id="roomShiftModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-arrows-split-up-and-left text-indigo-600"></i> Resident Room Shift
+          </h2>
+          <p id="shiftModalSubtitle" class="text-xs text-slate-500">Transfer resident to new room &amp; category</p>
+        </div>
+        <button type="button" onclick="closeShiftModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="submitRoomShift(event)" class="space-y-3.5">
+        <input type="hidden" id="shiftFromRoom" />
+        <input type="hidden" id="shiftResidentName" />
+        <input type="hidden" id="shiftResidentMobile" />
+        <input type="hidden" id="shiftOldFullRent" />
+        <input type="hidden" id="shiftOldPaidRent" />
+
+        <!-- Shift Date -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Date of Shift *</label>
+          <input type="date" id="shiftDate" required onchange="recalculateShiftRents()"
+                 class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        </div>
+
+        <!-- Target Room & Category -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">New Room No. *</label>
+            <input type="number" id="shiftToRoom" required placeholder="e.g. 302"
+                   class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">New Sharing *</label>
+            <select id="shiftToSharing" class="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-xl">
+              <option value="2">2 sharing</option>
+              <option value="3">3 sharing</option>
+              <option value="4">4 sharing</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Standard Rent of New Room -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">New Room Standard Rent (₹/mo) *</label>
+          <input type="number" id="shiftNewFullRent" required placeholder="e.g. 15500" oninput="recalculateShiftRents()"
+                 class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono" />
+        </div>
+
+        <!-- Pro-rated Rent Calculations (Both Editable) -->
+        <div class="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100 space-y-3">
+          <div class="text-[11px] font-bold text-indigo-900 flex items-center justify-between">
+            <span>Pro-Rated Rent Breakdown</span>
+            <span id="shiftSplitBadge" class="text-[10px] bg-indigo-100 px-2 py-0.5 rounded-md font-mono">--</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Old Room Rent (₹) *</label>
+              <input type="number" id="shiftOldProRatedRent" required oninput="recalculateRentCredit()"
+                     class="w-full text-xs font-bold px-3 py-2 border border-slate-300 bg-white rounded-xl font-mono text-slate-800" />
+              <span class="text-[9px] text-slate-400">Stayed till shift date</span>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">New Room Rent (₹) *</label>
+              <input type="number" id="shiftNewProRatedRent" required oninput="recalculateRentCredit()"
+                     class="w-full text-xs font-bold px-3 py-2 border border-slate-300 bg-white rounded-xl font-mono text-indigo-700" />
+              <span class="text-[9px] text-slate-400">Shift date till month end</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RENT CREDIT & SETTLEMENT CALCULATION BOX -->
+        <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-emerald-900">Already Paid in Old Room:</span>
+            <span id="shiftOldPaidDisplay" class="font-mono font-black text-slate-800">₹0</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-emerald-900">Transferred Rent Credit:</span>
+            <span id="shiftCarriedCreditDisplay" class="font-mono font-black text-emerald-700">₹0</span>
+          </div>
+          <div class="pt-1 border-t border-emerald-200 flex items-center justify-between text-xs">
+            <span class="font-black text-slate-800">Net Balance Remaining to Collect:</span>
+            <span id="shiftNetDueDisplay" class="font-mono font-black text-rose-700 text-sm">₹0</span>
+          </div>
+        </div>
+
+        <!-- IMMEDIATE COLLECTION OF REMAINING RENT (OPTIONAL) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <label class="block text-[11px] font-bold text-slate-700">Collect Remaining Rent Now? (₹)</label>
+          <input type="number" id="shiftCollectNowAmt" placeholder="0 if paying later" oninput="toggleCollectModeBox()"
+                 class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono text-emerald-700 bg-white" />
+          <p class="text-[10px] text-slate-400">If unpaid now, the ₹ credit is applied and the remainder will show under Dues.</p>
+
+          <div id="shiftCollectModeBox" class="grid grid-cols-2 gap-2 pt-1 hidden">
+            <div>
+              <span class="text-[10px] font-bold text-slate-500">Mode</span>
+              <select id="shiftCollectMode" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="Cash">Cash</option>
+                <option value="PPay">PPay (PhonePe)</option>
+                <option value="GPay">GPay (Google Pay)</option>
+                <option value="Paytm">Paytm</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-slate-500">Receiver</span>
+              <select id="shiftCollectReceiver" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white">
+                <option value="None">None (Cash)</option>
+                <option value="Manohar">Manohar</option>
+                <option value="Sreekaran">Sreekaran</option>
+                <option value="Sudheer">Sudheer</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advance / Deposit Carry Forward -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Carried Advance (₹)</label>
+            <input type="number" id="shiftCarriedAdvance" required
+                   class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono text-emerald-700" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Extra Advance (₹)</label>
+            <input type="number" id="shiftExtraAdvance" placeholder="0 if none"
+                   class="w-full text-xs font-bold px-3 py-2 border border-slate-300 rounded-xl font-mono" />
+          </div>
+        </div>
+
+        <div id="shiftStatusBox" class="p-2.5 rounded-xl text-xs font-semibold hidden"></div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" onclick="closeShiftModal()" class="flex-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs">Cancel</button>
+          <button type="submit" id="shiftSubmitBtn" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md">
+            Execute Shift
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN WRAPPER -->
+  <div class="max-w-4xl mx-auto px-4 pt-4 sm:pt-8">
+    
+    <!-- TOP NAVBAR -->
+    <header class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 mb-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <a href="index.html" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1">
+            <i class="fa-solid fa-arrow-left"></i> Home
+          </a>
+          <span class="text-slate-300">&bull;</span>
+          <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Rent Ledger</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+          <i class="fa-solid fa-receipt text-indigo-600"></i> Elysium PG Rents
+        </h1>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="handleHeaderRefresh()" class="p-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition" title="Force Refresh">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <a href="rollover.html" class="p-2 text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition flex items-center gap-1" title="Monthly Rollover">
+          <i class="fa-solid fa-calendar-plus"></i>
+        </a>
+        <select id="monthSelect" onchange="handleMonthChange()" class="text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="October 2026">October 2026</option>
+          <option value="November 2026">November 2026</option>
+          <option value="December 2026">December 2026</option>
+        </select>
+        <button onclick="logoutApp()" class="p-2 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition" title="Lock">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- NAVIGATION TABS -->
+    <div class="flex gap-2 mb-6 bg-slate-200/70 p-1 rounded-2xl">
+      <button type="button" onclick="switchView('roomView')" id="tabBtnRooms" 
+              class="flex-1 py-2.5 rounded-xl font-bold text-xs transition bg-white text-indigo-900 shadow-sm">
+        <i class="fa-solid fa-bed mr-1.5 text-indigo-600"></i> Room Ledger
+      </button>
+      <button type="button" onclick="switchView('duesView')" id="tabBtnDues" 
+              class="flex-1 py-2.5 rounded-xl font-bold text-xs transition text-slate-600 hover:text-slate-900">
+        <i class="fa-solid fa-clock-rotate-left mr-1.5 text-amber-600"></i> Pending &amp; Partial Dues (<span id="duesCountBadge">0</span>)
+      </button>
+    </div>
+
+    <!-- VIEW 1: ROOM LEDGER -->
+    <div id="sectionRoomsView" class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+      <!-- 1. ROOM PICKER & SEARCH -->
+      <div class="md:col-span-5 bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Select Room</h2>
+          <span id="activeRoomBadge" class="text-indigo-600 font-extrabold text-sm">Room 101</span>
+        </div>
+
+        <div class="relative mb-3">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input type="number" id="roomSearchInput" oninput="handleRoomSearch(event)" placeholder="Search room no. (e.g. 406)"
+                 class="w-full pl-8 pr-3 py-2 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        </div>
+
+        <div class="grid grid-cols-6 gap-1 bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold text-center">
+          <button onclick="showFloor(1)" class="floor-tab py-1.5 rounded-lg active bg-white shadow-sm text-indigo-600" id="tabFloor1">F1</button>
+          <button onclick="showFloor(2)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor2">F2</button>
+          <button onclick="showFloor(3)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor3">F3</button>
+          <button onclick="showFloor(4)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor4">F4</button>
+          <button onclick="showFloor(5)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor5">F5</button>
+          <button onclick="showFloor(6)" class="floor-tab py-1.5 rounded-lg text-slate-600" id="tabFloor6">F6</button>
+        </div>
+
+        <div id="roomsGrid" class="grid grid-cols-4 gap-2"></div>
+      </div>
+
+      <!-- 2. RESIDENT SELECTION & PAYMENT FORM -->
+      <div class="md:col-span-7 space-y-4">
+        
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+            2. Choose Resident in Room <span id="currentRoomText" class="text-indigo-600">101</span>
+          </h2>
+          
+          <div id="residentsListContainer" class="space-y-2">
+            <p class="text-xs text-slate-400 italic">Select a room to view residents...</p>
+          </div>
+        </div>
+
+        <!-- Step 3: Payment Entry Form (RESTORED WRAPPER CARD) -->
+        <div id="paymentFormCard" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hidden">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <div>
+              <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Recording Payment For</p>
+              <h3 id="targetResidentName" class="text-lg font-black text-slate-800">Resident Name</h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" id="clearPaymentBtn" onclick="confirmResetPayment()" 
+                      class="px-2.5 py-1 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition flex items-center gap-1 hidden" 
+                      title="Clear / Reset this month's recorded payment">
+                <i class="fa-solid fa-trash-can text-[10px]"></i>
+                <span>Reset to ₹0</span>
+              </button>
+              <div class="text-right pl-2 border-l border-slate-100">
+                <p class="text-[11px] text-slate-400 font-bold">Standard Rent</p>
+                <p id="targetExpectedRent" class="text-sm font-black text-slate-700">₹0</p>
+              </div>
+            </div>
+          </div>
+		  
+          <!-- EDIT / CORRECTION BANNER -->
+          <div id="correctionBanner" class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl mb-4 text-xs font-bold text-amber-800 flex items-center justify-between hidden">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-pen-to-square text-amber-600"></i>
+              <span>Correction Mode: Overwriting recorded payment</span>
+            </span>
+            <button type="button" onclick="cancelCorrectionMode()" class="text-amber-700 hover:text-amber-900 underline text-[11px]">
+              Switch to Add Payment
+            </button>
+          </div>
+		  
+          <form onsubmit="savePayment(event)" class="space-y-4">
+            <input type="hidden" id="targetRowIndex" />
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label id="payAmountLabel" class="text-xs font-bold text-slate-700">Amount Received Now (₹)</label>
+                <div class="flex items-center gap-3">
+                  <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
+                    <input type="checkbox" id="splitPaymentToggle" onchange="toggleSplitPayment()" class="rounded text-indigo-600 focus:ring-0 cursor-pointer" />
+                    <span>Split Payment</span>
+                  </label>
+                  <button type="button" onclick="toggleProRateBox()" class="text-[11px] font-bold text-slate-500 hover:text-slate-800">
+                    <i class="fa-solid fa-calculator"></i> Pro-Rate
+                  </button>
+                </div>
+              </div>
+              <input type="number" id="payAmount" required min="0" step="1" oninput="updatePaySummary()"
+                     class="w-full text-base font-bold px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-800" />
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p id="paySummaryLine" class="text-[11px] font-semibold text-slate-500"></p>
+                <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-slate-500 hover:text-slate-800">
+                  <input type="checkbox" id="payReplaceToggle" onchange="onPayTypeChange()" class="rounded text-indigo-600 focus:ring-0 cursor-pointer" />
+                  <span>Correct the total instead</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Pro-Rate Calculator Panel -->
+            <div id="proRateBox" class="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs space-y-2 hidden">
+              <p class="font-bold text-indigo-900">⚡ Mid-Month Day Calculator</p>
+              <div class="flex items-center gap-2">
+                <span class="text-slate-600">Days Stayed:</span>
+                <input type="number" id="calcDays" min="1" max="31" placeholder="e.g. 15" oninput="calcProRate()"
+                       class="w-20 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold" />
+                <span class="text-slate-500">=</span>
+                <span id="calculatedOutput" class="font-bold font-mono text-indigo-700">₹0</span>
+                <button type="button" onclick="applyCalculatedAmount()" class="ml-auto px-2.5 py-1 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-[11px]">
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            <!-- SINGLE PAYMENT SECTION -->
+            <div id="singlePaySection" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Payment Mode</label>
+                <select id="payMode" class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="Cash">Cash</option>
+                  <option value="PPay">PPay (PhonePe)</option>
+                  <option value="GPay">GPay (Google Pay)</option>
+                  <option value="Paytm">Paytm</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Received By</label>
+                <select id="payReceiver" class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="None">None (Cash)</option>
+                  <option value="Manohar">Manohar</option>
+                  <option value="Sreekaran">Sreekaran</option>
+                  <option value="Sudheer">Sudheer</option>
+                  <option value="Office Account">Office Account</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Payment Date</label>
+                <input type="date" id="payDate" required
+                       class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+
+            <!-- SPLIT PAYMENT SECTION -->
+            <div id="splitPaySection" class="p-3 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-3 hidden">
+              <p class="text-xs font-black text-indigo-900 flex items-center gap-1">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i> Split Breakdown
+              </p>
+
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Part 1 Mode</span>
+                  <select id="splitMode1" onchange="buildSplitSummary()" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                    <option value="Cash">Cash</option>
+                    <option value="PPay">PPay</option>
+                    <option value="GPay">GPay</option>
+                    <option value="Bank Transfer">Bank</option>
+                  </select>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Receiver 1</span>
+                  <select id="splitReceiver1" onchange="buildSplitSummary()" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                    <option value="None">None (Cash)</option>
+                    <option value="Manohar">Manohar</option>
+                    <option value="Sreekaran">Sreekaran</option>
+                    <option value="Sudheer">Sudheer</option>
+                  </select>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Amount 1 (₹)</span>
+                  <input type="number" id="splitAmt1" oninput="buildSplitSummary()" placeholder="10000"
+                         class="w-full text-xs font-bold p-2 border border-slate-300 rounded-lg" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Part 2 Mode</span>
+                  <select id="splitMode2" onchange="buildSplitSummary()" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                    <option value="PPay">PPay</option>
+                    <option value="Cash">Cash</option>
+                    <option value="GPay">GPay</option>
+                    <option value="Bank Transfer">Bank</option>
+                  </select>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Receiver 2</span>
+                  <select id="splitReceiver2" onchange="buildSplitSummary()" class="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg">
+                    <option value="Manohar">Manohar</option>
+                    <option value="Sreekaran">Sreekaran</option>
+                    <option value="Sudheer">Sudheer</option>
+                    <option value="None">None (Cash)</option>
+                  </select>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500">Amount 2 (₹)</span>
+                  <input type="number" id="splitAmt2" oninput="buildSplitSummary()" placeholder="500"
+                         class="w-full text-xs font-bold p-2 border border-slate-300 rounded-lg" />
+                </div>
+              </div>
+
+              <div class="text-[11px] p-2 bg-white rounded-lg border border-indigo-100 flex items-center justify-between">
+                <span class="text-slate-500 font-semibold">Mode Preview:</span>
+                <span id="splitStringPreview" class="font-mono font-bold text-indigo-700">Cash (0)+ PPay to Manohar (0)</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Remarks / Staying Dates (Optional)</label>
+              <input type="text" id="payRemarks" placeholder="e.g. Staying from 15th to 31st"
+                     class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <button type="submit" id="saveRentBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Save Payment to Sheet</span>
+            </button>
+          </form>
+
+          <div id="ledgerStatusBox" class="mt-4 p-3 rounded-xl text-xs font-semibold hidden"></div>
+
+          <div id="paymentHistoryBox" class="mt-5 pt-4 border-t border-slate-100 hidden">
+            <p class="text-[11px] font-bold text-slate-400 mb-2">Payments recorded this month</p>
+            <div id="paymentHistoryList" class="space-y-1.5"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- VIEW 2: DUES & PARTIAL PAYMENTS VIEW -->
+    <div id="sectionDuesView" class="hidden space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="filterDuesType('ALL')" id="filterBtnAll" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white transition">All Dues</button>
+          <button type="button" onclick="filterDuesType('Partial')" id="filterBtnPartial" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 transition">Partial Paid Only</button>
+          <button type="button" onclick="filterDuesType('Unpaid')" id="filterBtnUnpaid" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 transition">Unpaid Only</button>
+        </div>
+        <button type="button" onclick="loadAllDues(true)" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
+          <i class="fa-solid fa-rotate text-[11px]"></i> Refresh Dues
+        </button>
+      </div>
+
+      <div id="duesCardsContainer" class="space-y-3">
+        <div class="text-center py-10 text-slate-400 text-xs font-semibold">
+          <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Scanning all rooms for partial &amp; unpaid dues...
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button type="button" onclick="toggleIgnoredSection()" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-chevron-right text-[10px] transition-transform duration-200" id="ignoredChevron"></i>
+          <span>Ignored / Approved Exceptions (<span id="ignoredCountBadge">0</span>)</span>
+        </button>
+        <div id="ignoredCardsContainer" class="space-y-3 mt-3 hidden"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RECEIPT MODAL -->
+  <div id="receiptModal" class="fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-black text-slate-900">Payment receipt</h3>
+        <button type="button" onclick="closeReceiptModal()" class="text-slate-400 hover:text-slate-600 text-lg" aria-label="Close">&times;</button>
+      </div>
+      <div id="receiptPreview" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs space-y-1.5"></div>
+      <div id="receiptStatus" class="hidden"></div>
+      <div class="mt-4 space-y-2">
+        <button type="button" id="receiptShareBtn" onclick="shareReceiptPdf()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-sm transition">
+          <i class="fa-brands fa-whatsapp text-base"></i><span>Share PDF on WhatsApp</span>
+        </button>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="receiptChatBtn" onclick="openReceiptChat()" class="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Open resident's chat</button>
+          <button type="button" onclick="downloadReceiptPdf()" class="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Download PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentFloor = 1;
+    let selectedRoom = "101";
+    let activeResidents = [];
+    let currentSelectedResident = null;
+    let currentAdvResident = null;
+
+    let allDuesList = [];
+    let ignoredDuesKeys = JSON.parse(sessionStorage.getItem("elysium_ignored_dues") || "{}");
+    let currentDuesFilter = "ALL";
+
+    const ROOMS_CONFIG = PG_CONFIG.rooms; // edit rooms in auth.js
+
+    window.addEventListener("DOMContentLoaded", () => {
+      buildRoomsGrid(1);
+      document.getElementById("payDate").value = todayISO();
+
+      if (isAuthenticated()) {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadRoomResidents();
+          loadAllDues();
+        });
+      } else {
+        document.getElementById("pinLockModal").classList.remove("hidden");
+      }
+    });
+
+    function unlockApp() {
+      verifyStaffPin("staffPinInput", "pinErrorMsg", () => {
+        document.getElementById("pinLockModal").classList.add("hidden");
+        initDynamicMonthSelect("monthSelect").then(() => {
+          loadRoomResidents();
+          loadAllDues();
+          startBackgroundPrefetch(currentFloor);
+        });
+      });
+    }
+
+    function handleMonthChange() {
+      loadRoomResidents();
+      loadAllDues(true);
+    }
+
+    function handleHeaderRefresh() {
+      const duesView = document.getElementById("sectionDuesView");
+      if (duesView && !duesView.classList.contains("hidden")) {
+        loadAllDues(true);
+      } else {
+        loadRoomResidents(2, true);
+      }
+    }
+
+    function switchView(viewName) {
+      const roomView = document.getElementById("sectionRoomsView");
+      const duesView = document.getElementById("sectionDuesView");
+      const tabRooms = document.getElementById("tabBtnRooms");
+      const tabDues = document.getElementById("tabBtnDues");
+
+      if (viewName === "roomView") {
+        roomView.classList.remove("hidden");
+        duesView.classList.add("hidden");
+        tabRooms.className = "flex-1 py-2.5 rounded-xl font-bold text-xs transition bg-white text-indigo-900 shadow-sm";
+        tabDues.className = "flex-1 py-2.5 rounded-xl font-bold text-xs transition text-slate-600 hover:text-slate-900";
+      } else {
+        roomView.classList.add("hidden");
+        duesView.classList.remove("hidden");
+        tabDues.className = "flex-1 py-2.5 rounded-xl font-bold text-xs transition bg-white text-indigo-900 shadow-sm";
+        tabRooms.className = "flex-1 py-2.5 rounded-xl font-bold text-xs transition text-slate-600 hover:text-slate-900";
+        loadAllDues();
+      }
+    }
+
+    function showFloor(floorNum) {
+      currentFloor = floorNum;
+      document.querySelectorAll(".floor-tab").forEach((tab, idx) => {
+        if (idx + 1 === floorNum) {
+          tab.classList.add("bg-white", "shadow-sm", "text-indigo-600");
+          tab.classList.remove("text-slate-600");
+        } else {
+          tab.classList.remove("bg-white", "shadow-sm", "text-indigo-600");
+          tab.classList.add("text-slate-600");
+        }
+      });
+      buildRoomsGrid(floorNum);
+    }
+
+    function buildRoomsGrid(floor) {
+      const grid = document.getElementById("roomsGrid");
+      grid.innerHTML = "";
+      const rooms = ROOMS_CONFIG[floor] || [];
+
+      rooms.forEach((roomNum) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `room-btn p-3 rounded-xl border text-sm font-bold transition flex flex-col items-center justify-center ${
+          roomNum === selectedRoom ? "active" : "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-400"
+        }`;
+        btn.innerHTML = `<span class="text-xs text-slate-400 font-normal">Room</span><span>${roomNum}</span>`;
+        btn.onclick = () => selectRoom(roomNum);
+        grid.appendChild(btn);
+      });
+    }
+
+    function handleRoomSearch(e) {
+      const query = (e.target.value || "").trim();
+      if (query.length >= 3) {
+        const floor = parseInt(query[0], 10);
+        if (floor >= 1 && floor <= 6) {
+          if (floor !== currentFloor) {
+            showFloor(floor);
+          }
+          selectRoom(query);
+        }
+      }
+    }
+
+    function selectRoom(roomNum) {
+      selectedRoom = String(roomNum);
+      const activeBadge = document.getElementById("activeRoomBadge");
+      const currentRoomTxt = document.getElementById("currentRoomText");
+      if (activeBadge) activeBadge.innerText = `Room ${selectedRoom}`;
+      if (currentRoomTxt) currentRoomTxt.innerText = selectedRoom;
+
+      buildRoomsGrid(currentFloor);
+
+      const payCard = document.getElementById("paymentFormCard");
+      if (payCard) payCard.classList.add("hidden");
+
+      loadRoomResidents(2, false);
+    }
+
+    async function loadRoomResidents(retries = 2, forceRefresh = false) {
+      const month = document.getElementById("monthSelect").value;
+      const container = document.getElementById("residentsListContainer");
+      container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Loading Room ${selectedRoom} residents...</div>`;
+
+      try {
+        const json = await apiGet("getResidentsByRoom", {
+          roomNumber: selectedRoom, month: month, includeVacated: "true", forceRefresh: forceRefresh ? "true" : ""
+        });
+
+        const rawList = json.residents || [];
+        const todayStr = todayISO();
+
+        // Residents who already left stay visible only while they still owe money
+        activeResidents = rawList.filter(r => {
+          if (!r.vacatedOn || r.vacatedOn >= todayStr) return true;
+          return ((parseFloat(r.expectedRent) || 0) + (parseFloat(r.arrears) || 0) - (parseFloat(r.rentPaid) || 0)) > 0;
+        });
+
+        if (activeResidents.length === 0) {
+          container.innerHTML = `<p class="text-xs text-slate-500 italic p-3 bg-slate-50 rounded-xl">No active residents recorded for Room ${esc(selectedRoom)} in ${esc(month)}.</p>`;
+          return;
+        }
+
+        container.innerHTML = "";
+        activeResidents.forEach((r, idx) => {
+          const expectedRent = (parseFloat(r.expectedRent) || 0) + (parseFloat(r.arrears) || 0); // rent + carried-forward arrears
+          const rentPaid = parseFloat(r.rentPaid) || 0;
+          const dueAmt = Math.max(0, expectedRent - rentPaid);
+          const isFullyPaid = (expectedRent > 0 && rentPaid >= expectedRent);
+          const isPartial = (rentPaid > 0 && rentPaid < expectedRent);
+          const isUnpaid = (rentPaid === 0);
+
+          const key = `${selectedRoom}_${r.name}`;
+          const isIgnored = Boolean(ignoredDuesKeys[key]);
+
+          let cardBg = "bg-white border-slate-200";
+          let badgeHtml = "";
+
+          if (isFullyPaid || isIgnored) {
+            cardBg = "bg-emerald-50/40 border-emerald-200";
+            badgeHtml = `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-lg">
+              ${isIgnored && !isFullyPaid ? '✓ Approved' : `Paid ₹${rentPaid}`}
+            </span>`;
+          } else if (isPartial) {
+            cardBg = "bg-amber-50/40 border-amber-300";
+            badgeHtml = `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-[10px] font-black rounded-lg border border-amber-200">
+              Partial: ₹${rentPaid} (Due ₹${dueAmt})
+            </span>`;
+          } else {
+            badgeHtml = `<span class="px-2.5 py-1 bg-rose-50 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200">
+              Unpaid
+            </span>`;
+          }
+
+          const card = document.createElement("div");
+          card.id = `resident-card-${idx}`;
+          card.className = `resident-card p-3.5 rounded-2xl border cursor-pointer hover:border-indigo-400 transition flex flex-col gap-2.5 ${cardBg}`;
+
+          let noticeTag = "";
+          if (r.vacated) {
+            noticeTag = `<span class="text-[10px] text-rose-600 font-bold ml-1.5">(Left on ${esc(r.vacatedOn)} - dues pending)</span>`;
+          } else if (r.vacatedOn) {
+            noticeTag = `<span class="text-[10px] text-amber-600 font-bold ml-1.5">(Leaving: ${esc(r.vacatedOn)})</span>`;
+          }
+
+          card.innerHTML = `
+            <!-- Top Row: Name, Subtext & Status Badge (Tapping selects resident) -->
+            <div class="flex items-start justify-between gap-2" onclick="chooseResident(${idx})">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-black text-slate-800 flex items-center gap-1.5 flex-wrap">
+                  <i class="fa-solid fa-user text-xs ${isFullyPaid || isIgnored ? 'text-emerald-600' : (isPartial ? 'text-amber-500' : 'text-slate-400')}"></i>
+                  <span class="break-words">${esc(r.name)}</span>
+                  ${noticeTag}
+                </p>
+                <p class="text-[11px] text-slate-500 font-semibold mt-1">
+                  Rent: ₹${esc(r.expectedRent)}${r.arrears > 0 ? ` + ₹${esc(r.arrears)} arrears` : ''} &bull; ${esc(r.mobile) || 'No Mobile'}
+                </p>
+              </div>
+              <div class="shrink-0 pt-0.5">
+                ${badgeHtml}
+              </div>
+            </div>
+
+            <!-- Bottom Row: Independent Action Buttons -->
+            <div class="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100">
+              <button type="button" onclick="event.stopPropagation(); openShiftFor(${idx})" 
+                      class="px-2.5 py-1 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition flex items-center gap-1">
+                <i class="fa-solid fa-arrows-split-up-and-left text-[10px]"></i>
+                <span>Shift</span>
+              </button>
+
+              <button type="button" onclick="event.stopPropagation(); openCollectAdvanceModal(${idx})" 
+                      class="px-2.5 py-1 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition flex items-center gap-1">
+                <i class="fa-solid fa-hand-holding-dollar text-[10px]"></i>
+                <span>Collect Adv</span>
+              </button>
+
+              <button type="button" onclick="event.stopPropagation(); openAdvanceFor(${idx})" 
+                      class="px-2.5 py-1 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition flex items-center gap-1">
+                <i class="fa-solid fa-arrow-rotate-left text-[10px]"></i>
+                <span>Return Adv</span>
+              </button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        container.innerHTML = `<p class="text-xs text-red-500 font-semibold p-3 bg-red-50 rounded-xl">Error: ${esc(err.message)}</p>`;
+      }
+    }
+
+    // Button helpers: look the resident up by position instead of putting names inside onclick strings
+    function openShiftFor(idx) {
+      const r = activeResidents[idx];
+      if (!r) return;
+      const deposit = Number(r.advance || r.advancePaid || 3000);
+      openShiftModal(selectedRoom, r.name, r.mobile || "", r.expectedRent, deposit, r.rentPaid || 0);
+    }
+    function openAdvanceFor(idx) {
+      const r = activeResidents[idx];
+      if (!r) return;
+      openAdvanceModal(r.name, selectedRoom, Number(r.advance || r.advancePaid || 3000));
+    }
+
+    function chooseResident(idx) {
+      currentSelectedResident = activeResidents[idx];
+      if (!currentSelectedResident) return;
+
+      document.querySelectorAll(".resident-card").forEach((c, i) => {
+        if (i === idx) c.classList.add("active");
+        else c.classList.remove("active");
+      });
+
+      document.getElementById("targetResidentName").innerText = currentSelectedResident.name || "Resident";
+      document.getElementById("targetExpectedRent").innerText = "₹" + (currentSelectedResident.expectedRent || 0);
+      document.getElementById("targetRowIndex").value = currentSelectedResident.rowIndex || "";
+      
+      // Configure Reset button visibility
+      const clearBtn = document.getElementById("clearPaymentBtn");
+      const alreadyPaid = parseFloat(currentSelectedResident.rentPaid) || 0;
+      if (clearBtn) {
+        if (alreadyPaid > 0) clearBtn.classList.remove("hidden");
+        else clearBtn.classList.add("hidden");
+      }
+
+      // Default mode setup
+      cancelCorrectionMode();
+      
+      const dueTotal = residentTotalDue(currentSelectedResident);
+      document.getElementById("payAmount").value = Math.max(0, dueTotal - alreadyPaid) || "";
+      loadedRemarks = currentSelectedResident.stayingDates || "";
+      document.getElementById("payRemarks").value = loadedRemarks;
+      document.getElementById("payMode").value = "Cash";
+      document.getElementById("payReceiver").value = "None";
+      document.getElementById("payDate").value = typeof todayISO === "function" ? todayISO() : new Date().toISOString().slice(0, 10);
+      document.getElementById("splitPaymentToggle").checked = false;
+      document.getElementById("singlePaySection").classList.remove("hidden");
+      document.getElementById("splitPaySection").classList.add("hidden");
+      onPayTypeChange();
+
+      const payCard = document.getElementById("paymentFormCard");
+      if (payCard) payCard.classList.remove("hidden");
+
+      const statusBox = document.getElementById("ledgerStatusBox");
+      if (statusBox) statusBox.classList.add("hidden");
+
+      const proBox = document.getElementById("proRateBox");
+      if (proBox) proBox.classList.add("hidden");
+
+      loadPaymentHistory();
+
+      if (payCard) payCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    let loadedRemarks = "";
+
+    function residentTotalDue(r) {
+      return (parseFloat(r.expectedRent) || 0) + (parseFloat(r.arrears) || 0);
+    }
+
+    function onPayTypeChange() {
+      const replace = document.getElementById("payReplaceToggle").checked;
+      const r = currentSelectedResident;
+      document.getElementById("payAmountLabel").innerText = replace ? "Correct Total Paid This Month (₹)" : "Amount Received Now (₹)";
+      if (r) {
+        const paid = parseFloat(r.rentPaid) || 0;
+        document.getElementById("payAmount").value = replace ? paid : (Math.max(0, residentTotalDue(r) - paid) || "");
+      }
+      updatePaySummary();
+    }
+
+    function updatePaySummary() {
+      const r = currentSelectedResident;
+      const line = document.getElementById("paySummaryLine");
+      if (!r || !line) return;
+      const paid = parseFloat(r.rentPaid) || 0;
+      const due = residentTotalDue(r);
+      const entered = parseFloat(document.getElementById("payAmount").value) || 0;
+      const replace = document.getElementById("payReplaceToggle").checked;
+      const after = replace ? entered : paid + entered;
+      const bal = Math.max(0, due - after);
+      line.innerText = `Already paid ₹${paid.toLocaleString("en-IN")} • Due ₹${due.toLocaleString("en-IN")} • After this: ${bal > 0 ? "₹" + bal.toLocaleString("en-IN") + " left" : "fully paid"}`;
+    }
+
+    async function loadPaymentHistory() {
+      const box = document.getElementById("paymentHistoryBox");
+      const list = document.getElementById("paymentHistoryList");
+      const r = currentSelectedResident;
+      if (!r) return;
+      box.classList.add("hidden");
+      try {
+        const json = await apiGet("getPaymentHistory", {
+          month: document.getElementById("monthSelect").value, roomNumber: selectedRoom, name: r.name
+        }, 0);
+        paymentHistory = (json.payments || []).filter(p => p.amount > 0);
+        if (paymentHistory.length === 0) { list.innerHTML = ""; return; }
+        list.innerHTML = paymentHistory.map((p, i) => `
+          <div class="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-xl text-xs">
+            <div class="min-w-0">
+              <span class="font-bold text-slate-800">₹${esc(Number(p.amount).toLocaleString("en-IN"))}</span>
+              <span class="text-slate-500"> • ${esc(p.paymentDate)} • ${esc(p.mode || "-")}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="enableCorrectionMode()" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg flex items-center gap-1 text-[11px]" title="Edit / Correct total">
+                <i class="fa-solid fa-pen-to-square"></i> Edit
+              </button>
+              <button type="button" onclick="openHistoryReceipt(${i})" class="shrink-0 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg flex items-center gap-1 text-[11px]">
+                <i class="fa-brands fa-whatsapp"></i> Receipt
+              </button>
+            </div>
+          </div>`).join("");
+        box.classList.remove("hidden");
+      } catch (e) { /* history is optional */ }
+    }
+
+    let paymentHistory = [];
+    function openHistoryReceipt(i) {
+      const p = paymentHistory[i];
+      if (!p) return;
+      openReceiptModal(receiptFromHistory(p, currentSelectedResident));
+    }
+
+    function toggleProRateBox() {
+      document.getElementById("proRateBox").classList.toggle("hidden");
+    }
+
+    function calcProRate() {
+      const days = parseInt(document.getElementById("calcDays").value, 10) || 0;
+      const rent = parseFloat(currentSelectedResident.expectedRent) || 0;
+      const total = Math.round((rent / prorateDays(document.getElementById("monthSelect").value)) * days);
+      document.getElementById("calculatedOutput").innerText = "₹" + total;
+    }
+
+    function applyCalculatedAmount() {
+      const days = parseInt(document.getElementById("calcDays").value, 10) || 0;
+      const rent = parseFloat(currentSelectedResident.expectedRent) || 0;
+      const total = Math.round((rent / prorateDays(document.getElementById("monthSelect").value)) * days);
+      document.getElementById("payAmount").value = total;
+      document.getElementById("payRemarks").value = `Pro-rated for ${days} days`;
+      // A pro-rated amount is the whole month's due: record it as the total, not as an extra payment
+      if ((parseFloat(currentSelectedResident.rentPaid) || 0) > 0) {
+        document.getElementById("payReplaceToggle").checked = true;
+        document.getElementById("payAmountLabel").innerText = "Correct Total Paid This Month (₹)";
+      }
+      updatePaySummary();
+    }
+
+    function toggleSplitPayment() {
+      const isSplit = document.getElementById("splitPaymentToggle").checked;
+      const singleSection = document.getElementById("singlePaySection");
+      const splitSection = document.getElementById("splitPaySection");
+
+      if (isSplit) {
+        singleSection.classList.add("hidden");
+        splitSection.classList.remove("hidden");
+        const currentTotal = parseFloat(document.getElementById("payAmount").value) || 0;
+        document.getElementById("splitAmt1").value = currentTotal;
+        document.getElementById("splitAmt2").value = "";
+        buildSplitSummary();
+      } else {
+        singleSection.classList.remove("hidden");
+        splitSection.classList.add("hidden");
+      }
+    }
+
+    function formatPart(mode, receiver, amt) {
+      const a = amt || 0;
+      if (receiver && receiver !== "None" && mode !== "Cash") {
+        return `${mode} to ${receiver} (${a})`;
+      }
+      return `${mode} (${a})`;
+    }
+
+    function buildSplitSummary() {
+      const mode1 = document.getElementById("splitMode1").value;
+      const rec1 = document.getElementById("splitReceiver1").value;
+      const amt1 = parseFloat(document.getElementById("splitAmt1").value) || 0;
+
+      const mode2 = document.getElementById("splitMode2").value;
+      const rec2 = document.getElementById("splitReceiver2").value;
+      const amt2 = parseFloat(document.getElementById("splitAmt2").value) || 0;
+
+      const part1Str = formatPart(mode1, rec1, amt1);
+      const part2Str = formatPart(mode2, rec2, amt2);
+
+      const combined = `${part1Str}+ ${part2Str}`;
+      document.getElementById("splitStringPreview").innerText = combined;
+      document.getElementById("payAmount").value = amt1 + amt2;
+      return combined;
+    }
+
+    async function savePayment(e) {
+      e.preventDefault();
+      const btn = document.getElementById("saveRentBtn");
+      const statusBox = document.getElementById("ledgerStatusBox");
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Writing to Google Sheets...`;
+      statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = `Saving payment for ${currentSelectedResident.name}...`;
+
+      const isSplit = document.getElementById("splitPaymentToggle").checked;
+      let finalModeString = "";
+      let paymentParts = [];   // who received which part (feeds the partner cashflow exactly)
+
+      if (isSplit) {
+        finalModeString = buildSplitSummary();
+        paymentParts = [
+          { mode: document.getElementById("splitMode1").value, receiver: document.getElementById("splitReceiver1").value, amount: parseFloat(document.getElementById("splitAmt1").value) || 0 },
+          { mode: document.getElementById("splitMode2").value, receiver: document.getElementById("splitReceiver2").value, amount: parseFloat(document.getElementById("splitAmt2").value) || 0 }
+        ].filter(p => p.amount > 0);
+      } else {
+        const selectedMode = document.getElementById("payMode").value;
+        const selectedReceiver = document.getElementById("payReceiver").value;
+        if (selectedReceiver && selectedReceiver !== "None" && selectedMode !== "Cash") {
+          finalModeString = `${selectedMode} to ${selectedReceiver}`;
+        } else {
+          finalModeString = selectedMode;
+        }
+        paymentParts = [{ mode: selectedMode, receiver: selectedReceiver, amount: parseFloat(document.getElementById("payAmount").value) || 0 }];
+      }
+
+      const payload = {
+        action: "recordRentPayment",
+        month: document.getElementById("monthSelect").value,
+        roomNumber: selectedRoom,
+        rowIndex: document.getElementById("targetRowIndex").value,
+        residentName: currentSelectedResident.name,
+        rentPaid: document.getElementById("payAmount").value,
+        entryType: document.getElementById("payReplaceToggle").checked ? "replace" : "add",
+        paymentDate: document.getElementById("payDate").value,
+        mode: finalModeString,
+        parts: paymentParts,
+        remarks: document.getElementById("payRemarks").value !== loadedRemarks ? document.getElementById("payRemarks").value : undefined
+      };
+
+      try {
+        const result = await apiPost(payload);
+
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ Payment saved for <b>${esc(currentSelectedResident.name)}</b>!`;
+
+        setTimeout(() => { statusBox.classList.add("hidden"); }, 4000);
+        loadRoomResidents(2, true);
+        loadAllDues(true);
+
+        if (result.receipt) {
+          openReceiptModal(result.receipt);
+        }
+      } catch (err) {
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-700 border border-red-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>Save Payment to Sheet</span>`;
+      }
+    }
+
+    let currentCollectAdvResident = null;
+
+    function openCollectAdvanceModal(idx) {
+      const r = activeResidents[idx];
+      if (!r) return;
+      currentCollectAdvResident = r;
+
+      const agreed = Number(r.advance) || 0;
+      const alreadyPaid = Number(r.advancePaid) || 0;
+      const remaining = Math.max(0, agreed - alreadyPaid);
+
+      document.getElementById("colAdvResidentName").innerText = `${r.name} (Room ${selectedRoom})`;
+      document.getElementById("colAdvStatusText").innerText = `Agreed: ₹${agreed} • Already Paid: ₹${alreadyPaid}`;
+      document.getElementById("colAdvAmount").value = remaining > 0 ? remaining : "";
+      document.getElementById("colAdvStatusBox").classList.add("hidden");
+      document.getElementById("collectAdvanceModal").classList.remove("hidden");
+    }
+
+    function closeCollectAdvanceModal() {
+      document.getElementById("collectAdvanceModal").classList.add("hidden");
+      currentCollectAdvResident = null;
+    }
+
+    async function submitCollectAdvance(e) {
+      e.preventDefault();
+      if (!currentCollectAdvResident) return;
+
+      const btn = document.getElementById("colAdvSubmitBtn");
+      const statusBox = document.getElementById("colAdvStatusBox");
+      const amount = document.getElementById("colAdvAmount").value;
+      const receiver = document.getElementById("colAdvReceiver").value;
+      const month = document.getElementById("monthSelect").value;
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...`;
+      statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = `Saving advance for ${currentCollectAdvResident.name}...`;
+
+      try {
+        const res = await apiPost({
+          action: "recordAdvancePayment",
+          month: month,
+          roomNumber: selectedRoom,
+          rowIndex: currentCollectAdvResident.rowIndex,
+          residentName: currentCollectAdvResident.name,
+          advancePaid: amount,
+          receivedBy: receiver
+        });
+
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(res.message)}`;
+
+        setTimeout(() => {
+          closeCollectAdvanceModal();
+          loadRoomResidents(2, true);
+        }, 1200);
+
+      } catch (err) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Save Advance</span>`;
+      }
+    }
+
+    // ==========================================
+    // ADVANCE RETURN & MAINTENANCE SETTLEMENT
+    // ==========================================
+    function openAdvanceModal(name, room, totalAdvance) {
+      currentAdvResident = { name, room };
+      document.getElementById("advModalResidentName").innerText = `${name} (Room ${room})`;
+      document.getElementById("advTotalAmount").value = totalAdvance || 3000;
+      document.getElementById("advMaintenanceDeduction").value = PG_CONFIG.defaultMaintenanceDeduction;
+      document.getElementById("advVacatingDate").value = todayISO();
+      document.getElementById("advStatusBox").classList.add("hidden");
+      calculateNetRefund();
+      document.getElementById("advanceReturnModal").classList.remove("hidden");
+    }
+
+    function closeAdvanceModal() {
+      document.getElementById("advanceReturnModal").classList.add("hidden");
+    }
+
+    function calculateNetRefund() {
+      const total = Number(document.getElementById("advTotalAmount").value) || 0;
+      const maint = Number(document.getElementById("advMaintenanceDeduction").value) || 0;
+      const net = Math.max(0, total - maint);
+      document.getElementById("advNetRefundDisplay").innerText = `-₹${net.toLocaleString('en-IN')}`;
+      return net;
+    }
+
+    async function submitAdvanceReturn() {
+      const netRefund = calculateNetRefund();
+      const returnedBy = document.getElementById("advReturnedBySelect").value;
+      const vacDate = document.getElementById("advVacatingDate").value;
+      const maint = document.getElementById("advMaintenanceDeduction").value;
+      const currentMonth = document.getElementById("monthSelect").value;
+      const statusBox = document.getElementById("advStatusBox");
+
+      if (!confirm(`Confirm advance settlement for ${currentAdvResident.name}?\n\n• Mandatory Maintenance: ₹${maint}\n• Net Refunded: ₹${netRefund}\n• Returned By: ${returnedBy}\n• Recorded as: -₹${netRefund}`)) {
+        return;
+      }
+
+      const btn = document.getElementById("advSubmitBtn");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Writing...`;
+      statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = `Recording settlement for ${currentAdvResident.name}...`;
+
+      try {
+        const json = await apiPost({
+          action: "settleAdvanceReturn",
+          month: currentMonth,
+          room: currentAdvResident.room,
+          name: currentAdvResident.name,
+          refundAmount: netRefund,
+          returnedBy: returnedBy,
+          vacatingDate: vacDate,
+          maintenanceDeducted: maint
+        });
+
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(json.message)}`;
+
+        setTimeout(() => {
+          closeAdvanceModal();
+          loadRoomResidents(2, true);
+        }, 1200);
+
+      } catch (err) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Confirm &amp; Write (-₹)</span>`;
+      }
+    }
+
+    // ==========================================
+    // ROOM SHIFT SYSTEM (FEATURE 2)
+    // ==========================================
+    function openShiftModal(fromRoom, residentName, mobile, currentRent, advance, alreadyPaid) {
+      document.getElementById("shiftFromRoom").value = fromRoom;
+      document.getElementById("shiftResidentName").value = residentName;
+      document.getElementById("shiftResidentMobile").value = mobile || "";
+      document.getElementById("shiftOldFullRent").value = currentRent || 7000;
+      document.getElementById("shiftOldPaidRent").value = alreadyPaid || 0;
+      document.getElementById("shiftCarriedAdvance").value = advance || 2000;
+      document.getElementById("shiftExtraAdvance").value = "";
+      document.getElementById("shiftNewFullRent").value = "";
+      document.getElementById("shiftCollectNowAmt").value = "";
+      document.getElementById("shiftCollectModeBox").classList.add("hidden");
+
+      document.getElementById("shiftModalSubtitle").innerText = `${residentName} (Currently in Room ${fromRoom})`;
+      document.getElementById("shiftDate").value = todayISO();
+
+      recalculateShiftRents();
+      document.getElementById("roomShiftModal").classList.remove("hidden");
+    }
+
+    function closeShiftModal() {
+      document.getElementById("roomShiftModal").classList.add("hidden");
+      document.getElementById("shiftStatusBox").classList.add("hidden");
+    }
+
+    function recalculateShiftRents() {
+      const shiftDateStr = document.getElementById("shiftDate").value;
+      const oldFullRent = parseFloat(document.getElementById("shiftOldFullRent").value) || 0;
+      const newFullRent = parseFloat(document.getElementById("shiftNewFullRent").value) || 0;
+      if (!shiftDateStr) return;
+
+      const dateObj = new Date(shiftDateStr + "T00:00:00");
+      const day = dateObj.getDate();
+      const totalDays = PG_CONFIG.prorateUseActualDays ? new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate() : 30;
+
+      const daysOld = Math.max(0, day - 1);
+      const daysNew = Math.max(1, totalDays - day + 1);
+
+      document.getElementById("shiftSplitBadge").innerText = `${daysOld}d Old / ${daysNew}d New`;
+
+      const oldPro = Math.round((oldFullRent / totalDays) * daysOld);
+      const newPro = newFullRent > 0 ? Math.round((newFullRent / totalDays) * daysNew) : 0;
+
+      document.getElementById("shiftOldProRatedRent").value = oldPro;
+      if (newFullRent > 0) {
+        document.getElementById("shiftNewProRatedRent").value = newPro;
+      }
+
+      recalculateRentCredit();
+    }
+
+    function recalculateRentCredit() {
+      const alreadyPaid = parseFloat(document.getElementById("shiftOldPaidRent").value) || 0;
+      const oldProRated = parseFloat(document.getElementById("shiftOldProRatedRent").value) || 0;
+      const newProRated = parseFloat(document.getElementById("shiftNewProRatedRent").value) || 0;
+
+      const carriedCredit = Math.max(0, alreadyPaid - oldProRated);
+      const netDue = Math.max(0, newProRated - carriedCredit);
+
+      document.getElementById("shiftOldPaidDisplay").innerText = "₹" + alreadyPaid.toLocaleString("en-IN");
+      document.getElementById("shiftCarriedCreditDisplay").innerText = "₹" + carriedCredit.toLocaleString("en-IN");
+      document.getElementById("shiftNetDueDisplay").innerText = "₹" + netDue.toLocaleString("en-IN");
+
+      const collectInput = document.getElementById("shiftCollectNowAmt");
+      if (collectInput.value === "" && netDue > 0) {
+        collectInput.placeholder = `e.g. ${netDue}`;
+      }
+    }
+
+    function toggleCollectModeBox() {
+      const amt = parseFloat(document.getElementById("shiftCollectNowAmt").value) || 0;
+      const box = document.getElementById("shiftCollectModeBox");
+      if (amt > 0) {
+        box.classList.remove("hidden");
+      } else {
+        box.classList.add("hidden");
+      }
+    }
+
+    async function submitRoomShift(e) {
+      e.preventDefault();
+      const btn = document.getElementById("shiftSubmitBtn");
+      const statusBox = document.getElementById("shiftStatusBox");
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Shifting...`;
+      statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 block";
+      statusBox.innerText = "Executing room transfer in Google Sheet...";
+
+      const alreadyPaid = parseFloat(document.getElementById("shiftOldPaidRent").value) || 0;
+      const oldProRated = parseFloat(document.getElementById("shiftOldProRatedRent").value) || 0;
+      const carriedCredit = Math.max(0, alreadyPaid - oldProRated);
+
+      const collectNowAmt = parseFloat(document.getElementById("shiftCollectNowAmt").value) || 0;
+      let collectModeStr = "";
+      if (collectNowAmt > 0) {
+        const mode = document.getElementById("shiftCollectMode").value;
+        const rec = document.getElementById("shiftCollectReceiver").value;
+        if (rec && rec !== "None" && mode !== "Cash") {
+          collectModeStr = `${mode} to ${rec} (₹${collectNowAmt})`;
+        } else {
+          collectModeStr = `${mode} (₹${collectNowAmt})`;
+        }
+      }
+
+      const payload = {
+        action: "shiftResident",
+        month: document.getElementById("monthSelect").value,
+        fromRoom: document.getElementById("shiftFromRoom").value,
+        toRoom: document.getElementById("shiftToRoom").value,
+        residentName: document.getElementById("shiftResidentName").value,
+        mobile: document.getElementById("shiftResidentMobile").value,
+        shiftDate: document.getElementById("shiftDate").value,
+        toSharing: document.getElementById("shiftToSharing").value,
+        oldRoomRent: oldProRated,
+        newRoomStandardRent: document.getElementById("shiftNewFullRent").value,
+        newRoomProRatedRent: document.getElementById("shiftNewProRatedRent").value,
+        carriedRentCredit: carriedCredit,
+        additionalRentPaidNow: collectNowAmt,
+        additionalRentMode: collectModeStr,
+        transferredAdvance: document.getElementById("shiftCarriedAdvance").value,
+        additionalAdvance: document.getElementById("shiftExtraAdvance").value || 0
+      };
+
+      try {
+        const json = await apiPost(payload);
+
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ ${esc(json.message)}`;
+        setTimeout(() => {
+          closeShiftModal();
+          loadRoomResidents(2, true);
+          loadAllDues(true);
+        }, 1200);
+      } catch (err) {
+        statusBox.className = "p-2.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "Execute Shift";
+      }
+    }
+
+    // ==========================================
+    // DUES VIEW HANDLERS
+    // ==========================================
+    async function loadAllDues(force = false) {
+      if (allDuesList.length > 0 && !force) {
+        renderDues();
+        return;
+      }
+
+      const month = document.getElementById("monthSelect").value;
+      const container = document.getElementById("duesCardsContainer");
+      if (container) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Checking all resident balances for ${month}...</div>`;
+      }
+
+      try {
+        const json = await apiGet("getAllPendingDues", { month: month, forceRefresh: force ? "true" : "" });
+
+        allDuesList = json.dues || [];
+        renderDues();
+      } catch (err) {
+        if (container) {
+          container.innerHTML = `<div class="p-6 text-center text-xs text-red-500 font-bold bg-red-50 rounded-2xl">Error: ${esc(err.message)}</div>`;
+        }
+      }
+    }
+
+    function filterDuesType(type) {
+      currentDuesFilter = type;
+      ["ALL", "Partial", "Unpaid"].forEach(t => {
+        const btn = document.getElementById(`filterBtn${t === "ALL" ? "All" : t}`);
+        if (!btn) return;
+        if (t === type) {
+          btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white transition";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 transition";
+        }
+      });
+      renderDues();
+    }
+
+    function toggleIgnoreResident(idx) {
+      const item = allDuesList[idx];
+      if (!item) return;
+      const key = `${item.roomNumber}_${item.name}`;
+      const residentName = item.name;
+      if (ignoredDuesKeys[key]) {
+        delete ignoredDuesKeys[key];
+      } else {
+        const reason = prompt(`Enter exception reason for ${residentName} (e.g. Pro-rated stay, 15-15 cycle, Leaving early):`, "Approved exception");
+        if (reason === null) return;
+        ignoredDuesKeys[key] = reason.trim() || "Known exception";
+      }
+      sessionStorage.setItem("elysium_ignored_dues", JSON.stringify(ignoredDuesKeys));
+      renderDues();
+      loadRoomResidents();
+    }
+
+    function toggleIgnoredSection() {
+      const container = document.getElementById("ignoredCardsContainer");
+      const chevron = document.getElementById("ignoredChevron");
+      container.classList.toggle("hidden");
+      chevron.classList.toggle("rotate-90");
+    }
+
+    function sendWhatsAppReminder(idx) {
+      const item = allDuesList[idx];
+      if (!item) return;
+      const num = whatsappNumber(item.mobile);
+      if (!num) {
+        alert("No valid mobile number is recorded for this resident.");
+        return;
+      }
+      const month = document.getElementById("monthSelect").value;
+      const text = encodeURIComponent(`Hi ${item.name}, this is a gentle reminder from ${PG_CONFIG.pgName} regarding pending rent of ₹${item.balance.toLocaleString('en-IN')} for Room ${item.roomNumber} (${month}). Please clear the dues at your earliest convenience. Thank you!`);
+      window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+    }
+
+    function quickCollect(idx) {
+      const item = allDuesList[idx];
+      if (item) quickSelectResidentForPayment(item.roomNumber, item.name);
+    }
+
+    function quickSelectResidentForPayment(roomNumber, residentName) {
+      switchView("roomView");
+      const floor = parseInt(String(roomNumber)[0], 10);
+      if (floor >= 1 && floor <= 6) showFloor(floor);
+      selectRoom(roomNumber);
+      
+      setTimeout(() => {
+        const idx = activeResidents.findIndex(r => r.name === residentName);
+        if (idx !== -1) chooseResident(idx);
+      }, 700);
+    }
+
+    function renderDues() {
+      const activeContainer = document.getElementById("duesCardsContainer");
+      const ignoredContainer = document.getElementById("ignoredCardsContainer");
+      if (!activeContainer || !ignoredContainer) return;
+
+      const month = document.getElementById("monthSelect").value;
+
+      activeContainer.innerHTML = "";
+      ignoredContainer.innerHTML = "";
+
+      let activeCount = 0;
+      let ignoredCount = 0;
+
+      allDuesList.forEach((item, itemIdx) => {
+        const key = `${item.roomNumber}_${item.name}`;
+        const isIgnored = Boolean(ignoredDuesKeys[key]);
+
+        if (currentDuesFilter !== "ALL" && item.status !== currentDuesFilter) {
+          return;
+        }
+
+        const isPartial = item.status === "Partial";
+        const statusBadge = isPartial
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Paid ₹${esc(item.rentPaid)} • Due ₹${esc(item.balance)}</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Unpaid ₹${esc(item.balance)}</span>`;
+
+        const card = document.createElement("div");
+        card.className = `p-4 rounded-2xl border shadow-sm transition flex flex-wrap items-center justify-between gap-3 ${
+          isIgnored ? "bg-slate-50 border-slate-200 opacity-60" : "bg-white border-slate-200 hover:border-indigo-300"
+        }`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-black text-slate-900">Room ${esc(item.roomNumber)}</span>
+              <span class="text-slate-300">&bull;</span>
+              <span class="text-xs font-black text-slate-800">${esc(item.name)}</span>
+              ${statusBadge}
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1 font-semibold">
+              ${esc(item.mobile) || 'No Mobile'}
+              ${item.arrears > 0 ? ` &bull; incl. ₹${esc(item.arrears)} arrears` : ''}
+              ${item.hasLeft ? ` &bull; <span class="text-rose-600">Left on ${esc(item.vacatedOn)}</span>` : (item.vacatedOn ? ` &bull; Vacating on ${esc(item.vacatedOn)}` : '')}
+              ${isIgnored ? `<span class="text-indigo-600 font-bold ml-1.5">(Note: ${esc(ignoredDuesKeys[key])})</span>` : ''}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="toggleIgnoreResident(${itemIdx})" 
+                    class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition" 
+                    title="${isIgnored ? 'Restore to Defaulters' : 'Mark as Exception / Pro-rated'}">
+              <i class="fa-solid ${isIgnored ? 'fa-arrow-rotate-left' : 'fa-eye-slash'}"></i>
+              <span>${isIgnored ? 'Restore' : 'Ignore'}</span>
+            </button>
+
+            <button type="button" onclick="sendWhatsAppReminder(${itemIdx})" 
+                    class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+              <i class="fa-brands fa-whatsapp text-sm"></i>
+              <span>Remind</span>
+            </button>
+
+            <button type="button" onclick="quickCollect(${itemIdx})" 
+                    class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+              <i class="fa-solid fa-credit-card"></i>
+              <span>Collect</span>
+            </button>
+          </div>
+        `;
+
+        if (isIgnored) {
+          ignoredCount++;
+          ignoredContainer.appendChild(card);
+        } else {
+          activeCount++;
+          activeContainer.appendChild(card);
+        }
+      });
+
+      const duesBadge = document.getElementById("duesCountBadge");
+      const ignoredBadge = document.getElementById("ignoredCountBadge");
+      if (duesBadge) duesBadge.innerText = activeCount;
+      if (ignoredBadge) ignoredBadge.innerText = ignoredCount;
+
+      if (activeCount === 0) {
+        activeContainer.innerHTML = `<div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500 font-semibold">🎉 All active dues are collected or marked as known exceptions for ${esc(month)}!</div>`;
+      }
+    }
+
+    // ==========================================
+    // BACKGROUND PREFETCHING
+    // ==========================================
+    let prefetchQueue = [];
+
+    function startBackgroundPrefetch(floorNum) {
+      const month = document.getElementById("monthSelect").value;
+      const roomsOnFloor = ROOMS_CONFIG[floorNum] || [];
+      prefetchQueue = roomsOnFloor.filter(rm => rm !== selectedRoom);
+      runPrefetchWorker(month);
+    }
+
+    async function runPrefetchWorker(month) {
+      if (prefetchQueue.length === 0) return;
+      const nextRoom = prefetchQueue.shift();
+
+      apiGet("getResidentsByRoom", { roomNumber: nextRoom, month: month, includeVacated: "true" }, 0).catch(() => {});
+
+      setTimeout(() => runPrefetchWorker(month), 300);
+    }
+
+    const originalShowFloor = showFloor;
+    showFloor = function(floorNum) {
+      originalShowFloor(floorNum);
+      startBackgroundPrefetch(floorNum);
+    };
+	
+    // -------------------------------------------------------------
+    // PAYMENT CORRECTION & RESET HANDLERS
+    // -------------------------------------------------------------
+    function enableCorrectionMode() {
+      if (!currentSelectedResident) return;
+      const paid = parseFloat(currentSelectedResident.rentPaid) || 0;
+      
+      document.getElementById("payReplaceToggle").checked = true;
+      document.getElementById("correctionBanner").classList.remove("hidden");
+      document.getElementById("payAmountLabel").innerText = "Correct Total Paid This Month (₹)";
+      document.getElementById("payAmount").value = paid;
+      document.getElementById("saveRentBtn").innerHTML = `<i class="fa-solid fa-pen-to-square"></i> <span>Overwrite & Correct Sheet</span>`;
+      updatePaySummary();
+    }
+
+    function cancelCorrectionMode() {
+      if (!currentSelectedResident) return;
+      document.getElementById("payReplaceToggle").checked = false;
+      document.getElementById("correctionBanner").classList.add("hidden");
+      document.getElementById("payAmountLabel").innerText = "Amount Received Now (₹)";
+      document.getElementById("saveRentBtn").innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>Save Payment to Sheet</span>`;
+      const dueTotal = residentTotalDue(currentSelectedResident);
+      const paid = parseFloat(currentSelectedResident.rentPaid) || 0;
+      document.getElementById("payAmount").value = Math.max(0, dueTotal - paid) || "";
+      updatePaySummary();
+    }
+
+    async function confirmResetPayment() {
+      if (!currentSelectedResident) return;
+      const r = currentSelectedResident;
+      const paid = parseFloat(r.rentPaid) || 0;
+
+      if (!confirm(`Are you sure you want to completely RESET payment for ${r.name}?\n\n• Current recorded paid: ₹${paid}\n• New status: ₹0 (Unpaid)\n\nThis will clear payment mode and date in the sheet.`)) {
+        return;
+      }
+
+      const statusBox = document.getElementById("ledgerStatusBox");
+      statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 block";
+      statusBox.innerText = `Resetting payment to ₹0 for ${r.name}...`;
+
+      try {
+        const payload = {
+          action: "recordRentPayment",
+          month: document.getElementById("monthSelect").value,
+          roomNumber: selectedRoom,
+          rowIndex: r.rowIndex,
+          residentName: r.name,
+          rentPaid: 0,
+          entryType: "replace",
+          paymentDate: "",
+          mode: "",
+          remarks: "Payment reset"
+        };
+
+        const result = await apiPost(payload);
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
+        statusBox.innerHTML = `✓ Payment cleared! ${esc(r.name)} is now marked as Unpaid.`;
+
+        setTimeout(() => {
+          statusBox.classList.add("hidden");
+          loadRoomResidents(2, true);
+          loadAllDues(true);
+        }, 1200);
+
+      } catch (err) {
+        statusBox.className = "mt-4 p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 block";
+        statusBox.innerText = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
